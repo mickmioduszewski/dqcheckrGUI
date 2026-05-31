@@ -1,0 +1,195 @@
+---
+title: "Getting started with dqcheckrGUI"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting started with dqcheckrGUI}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, eval = FALSE)
+```
+
+`dqcheckrGUI` is a point-and-click Shiny interface for
+[dqcheckr](https://github.com/mickmioduszewski/dqcheckr). It lets you
+configure dataset quality checks, run them against incoming file deliveries,
+and browse historical results — without writing any R code.
+
+## Prerequisites
+
+Install `dqcheckr` before installing `dqcheckrGUI`:
+
+```{r}
+install.packages("dqcheckr")
+devtools::install_github("mickmioduszewski/dqcheckrGUI")
+```
+
+## Launching the app
+
+```{r}
+dqcheckrGUI::run_app()
+```
+
+The app opens in your default browser. It reads and writes configuration files
+from the working directory you launched it from, so set that to your project
+folder first.
+
+To use the example Star Wars configuration files included with the package, copy
+them to your working directory:
+
+```{r}
+file.copy(
+  system.file("extdata/example_config", package = "dqcheckrGUI"),
+  "config",
+  recursive = TRUE
+)
+```
+
+## The interface
+
+The sidebar has four sections:
+
+- **Datasets** — list of configured datasets; click one to view or edit it
+- **▶ Run** — run a quality check against a new file delivery
+- **⏱ History** — browse past runs and compare any two deliveries
+- **⚙ Global Config** — set default thresholds and file paths
+
+---
+
+## Setting up a dataset (8-step wizard)
+
+Click **+ New dataset** in the sidebar to open the configuration wizard.
+
+### Step 1 — Dataset identity
+
+Give the dataset a short machine-readable name (letters, numbers, and
+underscores only, starting with a letter) and an optional description.
+
+### Step 2 — File location
+
+Choose how files are identified:
+
+- **Folder scan** — point to a folder; the app picks up the most recently
+  modified file on each run. Suitable for delivery processes that drop files
+  into a fixed directory.
+- **Explicit file paths** — list one or more specific file paths. Useful when
+  files are versioned by name (e.g. `dataset_v1.csv`, `dataset_v2.csv`).
+
+### Step 3 — Format and structure
+
+The app shows a raw preview of the file. Select the format:
+
+- **CSV** — set the delimiter, quote character, and whether the file has a
+  header row.
+- **Fixed-width (FWF)** — drag the column boundary ruler over the preview to
+  define column positions. The ruler snaps to character positions.
+
+A parsed preview updates as you adjust settings.
+
+### Step 4 — Column classification
+
+Review the detected columns. For each column you can:
+
+- **Set a type override** — force a column to be treated as `character` even
+  if it looks numeric (e.g. postcodes, phone numbers, BSB codes).
+- **Mark as key column** — used in uniqueness checks.
+- **Mark as expected** — columns not present in a delivery will raise a
+  schema warning.
+
+### Step 5 — Column rules
+
+Expand any column to add optional per-column validation rules such as a
+maximum missing rate or a required value pattern.
+
+### Step 6 — Rule overrides
+
+Override the global default thresholds for this dataset only. For example,
+raise the maximum missing rate for a column that is known to be sparsely
+populated, or tighten the row-count change threshold for a stable reference
+dataset. Leave fields unchanged to inherit from Global Config.
+
+### Step 7 — Custom checks (optional)
+
+Point to a plain R file that defines a `custom_checks(df)` function. The
+function receives the dataset as a data frame and returns a list of
+`dq_result()` objects. See the `dqcheckr` documentation for the function
+signature.
+
+Leave this field blank to skip custom checks.
+
+### Step 8 — Review and save
+
+A summary of all settings is shown alongside a YAML preview of the
+configuration that will be written. Click **Save config ✓** to write the file.
+
+---
+
+## Running a quality check
+
+Click **▶ Run** in the sidebar.
+
+1. Select a dataset from the dropdown.
+2. Click **▶ Run check**.
+
+The app runs `dqcheckr::run_dq_check()` in a background process so the
+interface remains responsive. Progress is shown in the log area. When the
+check completes, the HTML report opens automatically in a new browser tab.
+
+---
+
+## Browsing history
+
+Click **⏱ History** in the sidebar to see a table of all past runs across
+all datasets, showing the date, dataset name, status (PASS / WARN / FAIL),
+row count, and report link.
+
+To compare two deliveries:
+
+1. Tick the checkbox next to exactly two runs **from the same dataset**.
+2. Click **Compare drift ▶**.
+
+The drift report opens in a new tab, showing column-by-column changes between
+the two snapshots.
+
+---
+
+## Global configuration
+
+Click **⚙ Global Config** to set defaults that apply to all datasets unless
+overridden at the dataset level.
+
+**Infrastructure paths**
+
+- **Snapshot database** — path to the SQLite file where run summaries and
+  column statistics are stored (default: `data/snapshots.sqlite`).
+- **Report output directory** — where HTML reports are written (default:
+  `reports/`).
+
+**Default rule thresholds**
+
+| Setting | Default | Meaning |
+|---|---|---|
+| Max missing rate | 0.05 | Flag a column if more than 5 % of values are blank |
+| Max non-numeric rate | 0.01 | Flag a numeric column if more than 1 % of values cannot be parsed |
+| Min row count | 0 (disabled) | Fail if the delivery has fewer rows than this |
+| Max row count change | 10 % | Warn if row count changes by more than 10 % vs previous delivery |
+| Max mean shift | 20 % | Warn if a numeric column mean shifts by more than 20 % |
+| Max missing change | 2 pp | Warn if missing rate changes by more than 2 percentage points |
+| Max non-numeric change | 1 pp | Warn if non-numeric rate changes by more than 1 percentage point |
+| Type inference threshold | 0.90 | A column is typed numeric if ≥ 90 % of values parse as numbers |
+
+**Schema change flags**
+
+Enable or disable warnings for: new columns appearing, columns being dropped,
+column types changing, or column order changing between deliveries.
+
+Click **Save global config** to write the changes.
+
+---
+
+## Learn more
+
+See `vignette("dqcheckr", package = "dqcheckr")` for a full description of
+every quality check (QC, SC, and CP series), per-column configuration options,
+custom checks, and the snapshot database schema.

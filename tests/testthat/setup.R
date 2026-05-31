@@ -4,9 +4,9 @@ library(yaml)
 library(withr)
 
 # Source app R files so unit tests can call them directly
-.app_r_dir <- normalizePath(file.path(test_path(), "../../R"))
+.app_r_dir <- system.file("app/R", package = "dqcheckrGUI")
 for (.f in list.files(.app_r_dir, pattern = "\\.R$", full.names = TRUE)) {
-  source(.f, local = FALSE)
+  source(.f, local = TRUE)
 }
 
 # Path to the test fixture CSV (absolute, so configs can reference it)
@@ -86,7 +86,7 @@ make_app_driver <- function(config_dir, envir = parent.frame(), ...) {
     envir = envir
   )
 
-  app_dir <- normalizePath(file.path(test_path(), "../.."))
+  app_dir <- system.file("app", package = "dqcheckrGUI")
   app <- shinytest2::AppDriver$new(app_dir, load_timeout = 30000, ...)
   withr::defer(try(app$stop(), silent = TRUE), envir = envir)
   app

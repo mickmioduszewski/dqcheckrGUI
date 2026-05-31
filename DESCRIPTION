@@ -1,0 +1,40 @@
+Package: dqcheckrGUI
+Type: Package
+Title: Shiny GUI Client for 'dqcheckr'
+Version: 0.1.0
+Date: 2026-05-31
+Authors@R: person("Mick", "Mioduszewski",
+                  email = "mick@mioduszewski.net",
+                  role  = c("aut", "cre"))
+Description:
+    A graphical user interface for the 'dqcheckr' package. Provides a
+    point-and-click Shiny application for configuring dataset quality checks,
+    running them against recurring file deliveries, and browsing historical
+    check results — without writing any R code.
+License: MIT + file LICENSE
+URL: https://github.com/mickmioduszewski/dqcheckrGUI
+BugReports: https://github.com/mickmioduszewski/dqcheckrGUI/issues
+Encoding: UTF-8
+Language: en-GB
+Depends:
+    R (>= 4.2)
+Imports:
+    dqcheckr,
+    shiny,
+    bslib,
+    shinyvalidate,
+    shinyFiles,
+    shinyWidgets,
+    shinyAce,
+    reactable,
+    rhandsontable,
+    DT,
+    callr,
+    yaml,
+    duckdb,
+    readr,
+    DBI,
+    glue
+Suggests:
+    testthat (>= 3.1.0)
+Config/testthat/edition: 3

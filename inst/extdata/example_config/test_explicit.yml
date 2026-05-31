@@ -1,0 +1,25 @@
+dataset_name: test_explicit
+format: csv
+encoding: ASCII
+delimiter: ','
+current_file: /Users/mick/Documents/code-testvarious/dataset quality check/dqr/dqcheckr/inst/demonstrations/data2/starwars_v1.csv
+expected_columns:
+- name
+- height
+- mass
+- hair_color
+- skin_color
+- eye_color
+- birth_year
+- sex
+- gender
+- homeworld
+- species
+- films
+- vehicles
+- starships
+rule_overrides:
+  max_row_count_change_pct: 0.1
+  max_numeric_mean_shift_pct: 0.2
+  max_missing_rate_change_pp: 5
+  max_non_numeric_rate_change_pp: 1

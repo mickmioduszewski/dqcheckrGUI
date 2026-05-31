@@ -1,0 +1,44 @@
+dataset_name: "starwars_folder"
+folder: "/Users/mick/Documents/code-testvarious/dataset quality check/dqr/dqcheckr/inst/demonstrations/data2/"
+format: csv
+encoding: "UTF-8"
+delimiter: ","
+snapshot_db: "/Users/mick/Documents/code-testvarious/dataset quality check/dqr/dqcheckr/inst/demonstrations/output2/snapshots.sqlite"
+report_output_dir: "/Users/mick/Documents/code-testvarious/dataset quality check/dqr/dqcheckr/inst/demonstrations/output2/reports/"
+
+expected_columns:
+  - name
+  - height
+  - mass
+  - hair_color
+  - skin_color
+  - eye_color
+  - birth_year
+  - sex
+  - gender
+  - homeworld
+  - species
+  - films
+  - vehicles
+  - starships
+
+key_columns:
+  - name
+
+rule_overrides:
+  max_missing_rate: 0.60
+  min_row_count: 80
+
+custom_checks_file: "/Users/mick/Documents/code-testvarious/dataset quality check/dqr/dqcheckr/inst/demonstrations/custom2/starwars_custom.R"
+
+column_rules:
+  sex:
+    allowed_values: ["male", "female", "none", "hermaphroditic"]
+  gender:
+    allowed_values: ["masculine", "feminine"]
+  height:
+    min_value: 50
+    max_value: 300
+  mass:
+    min_value: 1
+    max_value: 2000

@@ -1,0 +1,19 @@
+# R build artefacts
+*.Rcheck/
+*.tar.gz
+*.zip
+
+# R session data
+.Rhistory
+.RData
+.Ruserdata
+.Rproj.user/
+
+# Generated reports (runtime output, not source)
+reports/
+
+# SQLite databases (runtime state)
+data/*.sqlite
+
+# macOS
+.DS_Store

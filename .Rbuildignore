@@ -1,0 +1,12 @@
+^.*\.Rproj$
+^\.Rproj\.user$
+^\.gitignore$
+^\.github$
+^\.claude$
+^data$
+^reports$
+^launch\.sh$
+^launch\.bat$
+^launch\.command$
+^cran-comments\.md$
+^CRAN-SUBMISSION$

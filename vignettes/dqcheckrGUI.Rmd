@@ -16,6 +16,9 @@ knitr::opts_chunk$set(echo = TRUE, eval = FALSE)
 configure dataset quality checks, run them against incoming file deliveries,
 and browse historical results — without writing any R code.
 
+The app runs entirely on your local machine. No internet connection, no server,
+and no cloud services are required.
+
 ## Prerequisites
 
 Install `dqcheckr` before installing `dqcheckrGUI`:
@@ -31,12 +34,30 @@ devtools::install_github("mickmioduszewski/dqcheckrGUI")
 dqcheckrGUI::run_app()
 ```
 
-The app opens in your default browser. It reads and writes configuration files
-from the working directory you launched it from, so set that to your project
-folder first.
+The app opens in your default browser at `http://localhost:4321`. It reads and
+writes files relative to the working directory you launched from, so set that
+to your project folder before calling `run_app()`. The terminal window must
+remain open while the app is running — closing it stops the app.
 
-To use the example Star Wars configuration files included with the package, copy
-them to your working directory:
+Alternatively, double-click `launch.command` (macOS), `launch.sh` (Linux), or
+`launch.bat` (Windows) from the app directory.
+
+### First-run setup
+
+On first launch, if no `dqcheckr.yml` global config file exists in the working
+directory, the app opens directly to **Global Config** and prompts you to set
+two paths before doing anything else:
+
+- **Snapshot database** — where run summaries are stored (e.g. `data/snapshots.sqlite`)
+- **Report output directory** — where HTML reports are written (e.g. `reports/`)
+
+Click **Save global config** once these are set, then proceed to configure
+your first dataset.
+
+### Example configuration files
+
+Example YAML configuration files using the Star Wars dataset are included with
+the package. Copy them to get started quickly:
 
 ```{r}
 file.copy(
@@ -46,150 +67,321 @@ file.copy(
 )
 ```
 
+---
+
 ## The interface
 
-The sidebar has four sections:
+The app has a fixed sidebar on the left and a main panel that changes based on
+your selection.
 
-- **Datasets** — list of configured datasets; click one to view or edit it
-- **▶ Run** — run a quality check against a new file delivery
-- **⏱ History** — browse past runs and compare any two deliveries
-- **⚙ Global Config** — set default thresholds and file paths
+```
+┌──────────────────┬────────────────────────────────┐
+│  SIDEBAR         │  MAIN PANEL                    │
+│                  │                                │
+│  Datasets        │  [content changes here]        │
+│    customers ✓   │                                │
+│    suppliers ⚠   │                                │
+│    [+ New]       │                                │
+│                  │                                │
+│  ▶ Run           │                                │
+│  ⏱ History       │                                │
+│  ⚙ Global Config │                                │
+└──────────────────┴────────────────────────────────┘
+```
+
+### Status badges
+
+Status badges appear in the sidebar, dataset panel, and history table:
+
+| Badge | Meaning |
+|-------|---------|
+| ✓ PASS | All checks passed |
+| ⚠ WARN | One or more warnings; no failures |
+| ✗ FAIL | One or more checks failed |
+| ● RUNNING | A check is currently in progress |
+| — not run | No runs recorded yet |
 
 ---
 
-## Setting up a dataset (8-step wizard)
+## Dataset panel
+
+Clicking a dataset name in the sidebar opens its **Dataset panel** in the main
+area:
+
+```
+customer_accounts
+──────────────────────────────────────────
+Format: CSV   Location: data/incoming/
+Config: config/customer_accounts.yml
+
+[Edit config]          [Run check ▶]
+
+Recent runs (last 5):
+  2026-05-30   20260530.csv   ✓ PASS   0 failures
+  2026-05-23   20260523.csv   ⚠ WARN   0 failures
+  2026-05-16   20260516.csv   ✓ PASS   0 failures
+
+[View all in History →]
+
+Compare drift:  ☐ run 1  ☐ run 2   [Compare ▶]
+```
+
+- **Edit config** opens the 8-step wizard pre-populated with the existing settings.
+- **Run check ▶** navigates to the Run panel with this dataset pre-selected.
+- Clicking any row in the recent runs table opens that run's HTML report in a new browser tab.
+- **Compare drift** — tick two checkboxes from the recent runs table and click **Compare ▶** to produce a drift report comparing those two deliveries.
+
+---
+
+## Setting up a dataset — the 8-step wizard
 
 Click **+ New dataset** in the sidebar to open the configuration wizard.
+Navigate between steps using the **Back** and **Next** buttons, or click the
+numbered breadcrumb bar at the top. All values are preserved as you move back
+and forth. If you navigate away from the wizard with unsaved changes, the app
+will warn you before discarding them.
 
 ### Step 1 — Dataset identity
 
-Give the dataset a short machine-readable name (letters, numbers, and
-underscores only, starting with a letter) and an optional description.
+Enter a short machine-readable name for the dataset. Names must start with a
+letter and contain only letters, numbers, and underscores (e.g.
+`customer_accounts`). This name is used as the config filename and passed
+directly to `dqcheckr::run_dq_check()`.
+
+An optional free-text description can also be added.
 
 ### Step 2 — File location
 
-Choose how files are identified:
+Choose how files are identified for each run:
 
-- **Folder scan** — point to a folder; the app picks up the most recently
-  modified file on each run. Suitable for delivery processes that drop files
-  into a fixed directory.
-- **Explicit file paths** — list one or more specific file paths. Useful when
-  files are versioned by name (e.g. `dataset_v1.csv`, `dataset_v2.csv`).
+**Folder scan (recommended)** — point to a folder; the app picks the two most
+recently modified files automatically on each run. Use this for delivery
+processes that drop files into a fixed directory.
+
+A **Preview most recent file** button shows the names and sizes of the two most
+recent files in the selected folder: *"Current: 20260530.csv (2.4 MB) | Previous:
+20260523.csv (2.3 MB)"*.
+
+**Explicit file paths** — list a current file and optionally a previous file by
+path. Useful when files are versioned by name. If no previous file is given,
+comparison checks (CP series) are skipped.
 
 ### Step 3 — Format and structure
 
-The app shows a raw preview of the file. Select the format:
+This step identifies the file's format and column layout. The top of the screen
+shows a raw text preview of the first 50 lines of the file — the full file is
+never loaded.
 
-- **CSV** — set the delimiter, quote character, and whether the file has a
-  header row.
-- **Fixed-width (FWF)** — drag the column boundary ruler over the preview to
-  define column positions. The ruler snaps to character positions.
+**Auto-detection**: when a file is loaded, the app runs DuckDB's `sniff_csv()`
+and `readr::guess_encoding()` to detect the delimiter, encoding, quote
+character, and whether the first row is a header. Results are shown as an
+editable confirmation panel — you always make the final call, nothing is
+silently committed.
 
-A parsed preview updates as you adjust settings.
+#### CSV files
+
+Confirm or adjust:
+
+- **Format** (CSV or Fixed-Width)
+- **Delimiter** — comma, tab, semicolon, pipe, space, colon, or custom
+- **Encoding** — detected candidates are shown with confidence percentages
+- **Quote character**
+- **Header row** — whether the first row contains column names
+
+A parsed preview updates live as you change these settings. If there is no
+header row, a column-naming panel appears alongside the preview where you can
+enter names for each column. Names must be valid R identifiers; a suggestion
+is offered if you enter something invalid.
+
+#### Fixed-width (FWF) files
+
+When FWF is selected, a **visual ruler** activates above the text preview.
+
+- **Click** anywhere in the text to place a column boundary at that character
+  position.
+- **Drag** a boundary line left or right to adjust it — it snaps to character
+  boundaries.
+- **Double-click** a boundary line to remove it.
+- An **Auto-detect** button attempts automatic boundary detection using
+  `readr::fwf_empty()`.
+
+Below the ruler, a table shows the resulting column definitions (start
+position, width, name, type). Edit column names and types here. A validation
+badge confirms whether the column widths account for the full record length:
+
+- ✅ green — widths match the line length exactly
+- ⚠ amber — widths cover fewer characters than the line length (trailing
+  columns unaccounted for)
+- ✗ red — widths exceed the line length (Next is disabled until fixed)
+
+If the file has header rows to skip before the data begins, set
+**Header rows to skip**. Column names are pre-populated from the skipped header
+row if one is present.
 
 ### Step 4 — Column classification
 
-Review the detected columns. For each column you can:
+Review every detected column. For each column you can:
 
 - **Set a type override** — force a column to be treated as `character` even
-  if it looks numeric (e.g. postcodes, phone numbers, BSB codes).
-- **Mark as key column** — used in uniqueness checks.
-- **Mark as expected** — columns not present in a delivery will raise a
-  schema warning.
+  if it looks numeric. Use this for postcodes, phone numbers, account codes,
+  BSB numbers, or any identifier that happens to contain only digits. Click the
+  inferred type to open the override dropdown.
+- **Mark as key column** — that column will be checked for uniqueness (QC-12).
+- **Mark as expected** — columns not present in a delivery will raise a schema
+  warning (SC-01). All columns are expected by default; use **Select none** to
+  clear all and tick only the columns that must always be present.
 
 ### Step 5 — Column rules
 
-Expand any column to add optional per-column validation rules such as a
-maximum missing rate or a required value pattern.
+Each column is shown as a collapsible card. Expand a column to add optional
+per-column validation rules.
+
+**Standard rules** (always visible):
+
+| Rule | Applies to | Check |
+|------|------------|-------|
+| Allowed values | character columns | QC-09: flag any value not in the list |
+| Min value | numeric columns | QC-10: flag values below the minimum |
+| Max value | numeric columns | QC-10: flag values above the maximum |
+
+**Advanced rules** (click **Advanced ▼** to reveal):
+
+| Rule | Description |
+|------|-------------|
+| Regex pattern | Flag values that do not match the pattern (QC-13). Click **Test against sample** to verify the pattern against the actual file before saving. |
+| Max missing rate | Override the dataset-level threshold for this column only |
+| Max non-numeric rate | Override for numeric columns only |
+| Max missing rate change | Override the comparison threshold for this column |
+| Max mean shift | Override the mean shift threshold for this column |
+
+A regex syntax error disables **Next**; a pattern that fails against sample
+values shows a warning but does not block you from proceeding.
 
 ### Step 6 — Rule overrides
 
-Override the global default thresholds for this dataset only. For example,
-raise the maximum missing rate for a column that is known to be sparsely
-populated, or tighten the row-count change threshold for a stable reference
-dataset. Leave fields unchanged to inherit from Global Config.
+Override the global default thresholds for this dataset only. Fields match the
+global default until you change them — changed fields are highlighted, and a
+reset icon restores the global default. Only overridden fields are written to
+the config.
+
+| Threshold | Default | What it controls |
+|-----------|---------|-----------------|
+| Max missing rate | 0.05 | Flag a column if > 5 % of values are blank |
+| Max non-numeric rate | 0.01 | Flag a numeric column if > 1 % of values cannot be parsed |
+| Min row count | 0 (off) | Fail if the delivery has fewer rows than this |
+| Max row count change | 10 % | Warn if row count changes by > 10 % vs previous delivery |
+| Max mean shift | 20 % | Warn if a numeric column mean shifts by > 20 % |
+| Max missing change | 2 pp | Warn if missing rate changes by > 2 percentage points |
+| Max non-numeric change | 1 pp | Warn if non-numeric rate changes by > 1 percentage point |
+| Type inference threshold | 0.90 | A column is typed numeric if ≥ 90 % of values parse as numbers |
+
+Schema change flags control whether warnings are raised when columns are added,
+dropped, change type, or change order between deliveries.
 
 ### Step 7 — Custom checks (optional)
 
-Point to a plain R file that defines a `custom_checks(df)` function. The
-function receives the dataset as a data frame and returns a list of
-`dq_result()` objects. See the `dqcheckr` documentation for the function
-signature.
+Point to a plain R file that defines a `custom_checks(df)` function. The app
+validates the file immediately: it checks that the file exists, parses without
+syntax errors, and defines the expected function. A green badge confirms a
+valid file; a red badge shows the specific problem.
 
-Leave this field blank to skip custom checks.
+Leave this field blank to skip custom checks. See
+`vignette("dqcheckr", package = "dqcheckr")` for the custom checks function
+signature and return value.
 
 ### Step 8 — Review and save
 
 A summary of all settings is shown alongside a YAML preview of the
 configuration that will be written. Click **Save config ✓** to write the file.
+A success notification confirms the path. The app then navigates to the dataset
+panel for the saved dataset.
+
+**For analysts who hand-edit YAML**: the app preserves any keys you have added
+to the YAML file outside the wizard. On the next edit, those keys appear in
+the Step 8 preview under `# preserved from original file` and are written back
+unchanged. The wizard never silently drops hand-added config keys.
 
 ---
 
 ## Running a quality check
 
-Click **▶ Run** in the sidebar.
+Click **▶ Run** in the sidebar (or **Run check ▶** from a dataset panel).
 
 1. Select a dataset from the dropdown.
-2. Click **▶ Run check**.
+2. The app validates the config before enabling the run button — it checks that
+   the config file is readable, the data folder or files exist, and the output
+   paths are writable. Any problem is shown as a red badge with the specific
+   issue.
+3. Click **▶ Run check**.
 
-The app runs `dqcheckr::run_dq_check()` in a background process so the
-interface remains responsive. Progress is shown in the log area. When the
-check completes, the HTML report opens automatically in a new browser tab.
+The check runs in a background process so the UI stays responsive. Progress is
+streamed to the log area in real time. When complete:
+
+```
+Status: ✓ PASS    [Open report ↗]   [View log]
+
+  0 failures   0 warnings   22 passed
+  Report: reports/customer_accounts_20260531_143022.html
+```
+
+- **Open report ↗** opens the HTML report in the system browser.
+- **View log** shows the full run log in a dialog box.
+- **■ Stop** (shown during a run) cancels the background process. A
+  confirmation is shown first, noting that the snapshot will not be written if
+  the run has not completed.
 
 ---
 
 ## Browsing history
 
-Click **⏱ History** in the sidebar to see a table of all past runs across
-all datasets, showing the date, dataset name, status (PASS / WARN / FAIL),
-row count, and report link.
+Click **⏱ History** in the sidebar to see all past runs across all datasets.
 
-To compare two deliveries:
+The table can be filtered by dataset name, status, or date using the filter row
+at the top of each column. Click **Load more** to page through older runs.
+
+**To open a report**: click anywhere on a row (not the checkbox) to open that
+run's HTML report in the browser.
+
+**To compare two deliveries**:
 
 1. Tick the checkbox next to exactly two runs **from the same dataset**.
 2. Click **Compare drift ▶**.
 
 The drift report opens in a new tab, showing column-by-column changes between
-the two snapshots.
+the two snapshots. The button is disabled with a tooltip if the selected rows
+are from different datasets.
 
 ---
 
 ## Global configuration
 
 Click **⚙ Global Config** to set defaults that apply to all datasets unless
-overridden at the dataset level.
+overridden at the dataset level (Step 6).
 
-**Infrastructure paths**
+**Infrastructure paths** — set the snapshot database path and report output
+directory. The snapshot database is created automatically on first run if it
+does not exist. If the report output directory does not exist, a **Create
+directory** button appears.
 
-- **Snapshot database** — path to the SQLite file where run summaries and
-  column statistics are stored (default: `data/snapshots.sqlite`).
-- **Report output directory** — where HTML reports are written (default:
-  `reports/`).
+**Default rule thresholds** — the same thresholds described in Step 6 above,
+applied globally. Dataset-level overrides take precedence.
 
-**Default rule thresholds**
+Click **Save global config** to write changes.
 
-| Setting | Default | Meaning |
-|---|---|---|
-| Max missing rate | 0.05 | Flag a column if more than 5 % of values are blank |
-| Max non-numeric rate | 0.01 | Flag a numeric column if more than 1 % of values cannot be parsed |
-| Min row count | 0 (disabled) | Fail if the delivery has fewer rows than this |
-| Max row count change | 10 % | Warn if row count changes by more than 10 % vs previous delivery |
-| Max mean shift | 20 % | Warn if a numeric column mean shifts by more than 20 % |
-| Max missing change | 2 pp | Warn if missing rate changes by more than 2 percentage points |
-| Max non-numeric change | 1 pp | Warn if non-numeric rate changes by more than 1 percentage point |
-| Type inference threshold | 0.90 | A column is typed numeric if ≥ 90 % of values parse as numbers |
+### Team use via a shared network drive
 
-**Schema change flags**
-
-Enable or disable warnings for: new columns appearing, columns being dropped,
-column types changing, or column order changing between deliveries.
-
-Click **Save global config** to write the changes.
+Multiple users can share the same configuration and run history by pointing
+their `config_dir` and snapshot database paths at a shared network folder. Each
+user runs the app locally; the shared drive holds the YAML configs and the
+SQLite snapshot database. Set these paths in Global Config on each user's
+machine. SQLite handles concurrent reads safely; two simultaneous writes
+(unlikely in practice) are serialised by file locking.
 
 ---
 
 ## Learn more
 
 See `vignette("dqcheckr", package = "dqcheckr")` for a full description of
-every quality check (QC, SC, and CP series), per-column configuration options,
-custom checks, and the snapshot database schema.
+every quality check (QC-01 to QC-14, SC-01/02, CP-01 to CP-08), per-column
+configuration options, custom checks, snapshot database schema, and the
+`compare_snapshots()` function used for drift reports.

@@ -10,3 +10,6 @@
 ^launch\.command$
 ^cran-comments\.md$
 ^CRAN-SUBMISSION$
+^doc$
+^Meta$
+^docs$

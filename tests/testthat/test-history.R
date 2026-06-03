@@ -125,14 +125,8 @@ test_that("read_all_snapshot_history returns empty frame for missing db", {
 })
 
 # ── Report filename slug construction ─────────────────────────────────────────
-# This logic is inlined in server_history.R and ui_datasets.R to build /dq_reports/ URLs.
-# A regression here silently breaks all Open links.
-
-make_report_filename <- function(dataset_name, run_timestamp) {
-  ts_raw  <- gsub("[^0-9]", "", substr(run_timestamp, 1, 19))
-  ts_slug <- paste0(substr(ts_raw, 1, 8), "_", substr(ts_raw, 9, 14))
-  paste0(dataset_name, "_", ts_slug, ".html")
-}
+# make_report_filename() lives in utils.R and is loaded by setup.R.
+# A regression here silently breaks all Open links in server_history.R and ui_datasets.R.
 
 test_that("filename slug produces correct name for standard timestamp", {
   expect_equal(

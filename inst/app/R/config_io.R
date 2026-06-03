@@ -18,6 +18,7 @@ read_config <- function(path) {
     delimiter          = raw$delimiter %||% ",",
     quote_char         = raw$quote_char %||% '"',
     has_header         = is.null(raw$col_names),  # if col_names present → no header
+    col_names          = if (!is.null(raw$col_names)) unlist(raw$col_names) else character(0),
     folder             = raw$folder %||% "",
     current_file       = raw$current_file %||% "",
     previous_file      = raw$previous_file %||% "",

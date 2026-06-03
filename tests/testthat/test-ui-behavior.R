@@ -5,10 +5,6 @@ library(testthat)
 library(shinytest2)
 library(yaml)
 
-open_new_wizard <- function(app) {
-  app$click("btn_new_dataset")
-  app$wait_for_idle()
-}
 
 # ── Step 1: focus preservation ────────────────────────────────────────────────
 # Regression: renderUI re-rendered the whole step on every keystroke, losing focus.

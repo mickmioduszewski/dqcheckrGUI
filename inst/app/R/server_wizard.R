@@ -4,7 +4,9 @@
 server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
 
   # ── Wizard state ─────────────────────────────────────────────────────
-  wiz <- reactiveValues(
+  # Single source of truth for defaults — used to seed reactiveValues and to
+  # reset state when the wizard is opened for a new dataset.
+  .wiz_defaults <- list(
     mode="new", dataset_name="", description="",
     file_mode="folder", folder="", current_file="", previous_file="",
     format="csv", encoding="UTF-8", delimiter=",", quote_char='"',
@@ -18,7 +20,6 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
     extra_keys=list(),
     current_step=1L,
     step_valid=rep(FALSE, 8L),
-    # Preview state
     raw_lines=character(0),
     ruler_string=make_ruler_string(80),
     current_preview_path="",
@@ -27,6 +28,7 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
     csv_preview_df=NULL, csv_col_names_detected=character(0),
     fwf_preview_df=NULL, fwf_starts=integer(0), fwf_line_len=80L
   )
+  wiz <- do.call(reactiveValues, .wiz_defaults)
 
   open_wizard <- function(mode, dataset_name=NULL) {
     if (mode == "edit" && !is.null(dataset_name)) {
@@ -51,39 +53,7 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
         }
       }
     } else {
-      defaults <- list(
-        mode                 = "new",
-        dataset_name         = "",
-        description          = "",
-        file_mode            = "folder",
-        folder               = "",
-        current_file         = "",
-        previous_file        = "",
-        format               = "csv",
-        encoding             = "UTF-8",
-        delimiter            = ",",
-        quote_char           = '"',
-        has_header           = TRUE,
-        col_names            = character(0),
-        col_types_inferred   = character(0),
-        col_types_override   = list(),
-        key_columns          = character(0),
-        expected_columns     = character(0),
-        fwf_widths           = integer(0),
-        fwf_col_names        = character(0),
-        fwf_skip             = 0L,
-        column_rules         = list(),
-        rule_overrides       = list(),
-        custom_checks_file   = "",
-        extra_keys           = list(),
-        current_step         = 1L,
-        step_valid           = rep(FALSE, 8L),
-        raw_lines            = character(0),
-        current_preview_path = "",
-        csv_preview_df       = NULL,
-        fwf_preview_df       = NULL
-      )
-      for (nm in names(defaults)) wiz[[nm]] <- defaults[[nm]]
+      for (nm in names(.wiz_defaults)) wiz[[nm]] <- .wiz_defaults[[nm]]
     }
     rv$wizard_open <- TRUE
     rv$active_section <- "wizard"

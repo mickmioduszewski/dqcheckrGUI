@@ -72,6 +72,7 @@ server_history <- function(input, output, session, rv, config_dir, gcfg_rv) {
     prev_id    <- min(as.integer(c(id1, id2)))
     curr_id    <- max(as.integer(c(id1, id2)))
     showNotification("Starting drift comparison...", type = "message", duration = 4)
+    drift_log           <- tempfile("dqcheckr_drift_", fileext = ".log")
     rv_drift$proc       <- callr::r_bg(
       func = function(dn, p, c, db, cd) {
         dqcheckr::compare_snapshots(dn,
@@ -80,14 +81,17 @@ server_history <- function(input, output, session, rv, config_dir, gcfg_rv) {
           report = TRUE, open_report = FALSE)
       },
       args    = list(dn = ds_name, p = prev_id, c = curr_id, db = db_path, cd = cd),
+      stdout  = drift_log,
+      stderr  = "2>&1",
       package = TRUE
     )
+    rv_drift$log_path   <- drift_log
     rv_drift$report_dir <- report_dir
     rv_drift$ds_name    <- ds_name
   }
 
   # Compare drift — async, non-blocking
-  rv_drift <- reactiveValues(proc = NULL, report_dir = NULL, ds_name = NULL)
+  rv_drift <- reactiveValues(proc = NULL, report_dir = NULL, ds_name = NULL, log_path = NULL)
 
   observeEvent(input$history_compare, {
     ids <- input$hist_selected_ids
@@ -113,7 +117,16 @@ server_history <- function(input, output, session, rv, config_dir, gcfg_rv) {
     if (is.null(proc) || proc$is_alive()) return()
 
     result <- tryCatch(proc$get_result(), error = function(e) {
-      showNotification(paste("Drift comparison failed:", conditionMessage(e)),
+      last_line <- tryCatch({
+        lp <- rv_drift$log_path
+        if (!is.null(lp) && file.exists(lp)) {
+          lines <- readLines(lp, warn = FALSE)
+          lines <- lines[nchar(trimws(lines)) > 0]
+          if (length(lines) > 0) tail(lines, 1) else ""
+        } else ""
+      }, error = function(e2) "")
+      msg <- if (nchar(last_line) > 0) last_line else conditionMessage(e)
+      showNotification(paste("Drift comparison failed:", msg),
                        type = "error", duration = 10)
       NULL
     })

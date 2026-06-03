@@ -24,16 +24,13 @@ Imports:
     bslib,
     shinyvalidate,
     shinyFiles,
-    shinyWidgets,
     shinyAce,
     reactable,
-    rhandsontable,
     DT,
     callr,
     yaml,
     readr,
     DBI,
-    glue,
     RSQLite
 Suggests:
     testthat (>= 3.1.0),

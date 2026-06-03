@@ -258,10 +258,11 @@ values shows a warning but does not block you from proceeding.
 
 ### Step 6 — Rule overrides
 
-Override the global default thresholds for this dataset only. Fields match the
-global default until you change them — changed fields are highlighted, and a
-reset icon restores the global default. Only overridden fields are written to
-the config.
+Override the global default thresholds for this dataset only. Each field is
+pre-filled with the current global default. Only fields whose value differs from
+the global default are written to the dataset config; fields left at their
+default are omitted so that a later change to the global config is automatically
+inherited.
 
 | Threshold | Default | What it controls |
 |-----------|---------|-----------------|
@@ -338,8 +339,8 @@ Click **⏱ History** in the sidebar to see all past runs across all datasets.
 The table can be filtered by dataset name, status, or date using the filter row
 at the top of each column. Click **Load more** to page through older runs.
 
-**To open a report**: click anywhere on a row (not the checkbox) to open that
-run's HTML report in the browser.
+**To open a report**: click the **Open** link in the Report column to open that
+run's HTML report in a new browser tab.
 
 **To compare two deliveries**:
 
@@ -359,8 +360,8 @@ overridden at the dataset level (Step 6).
 
 **Infrastructure paths** — set the snapshot database path and report output
 directory. The snapshot database is created automatically on first run if it
-does not exist. If the report output directory does not exist, a **Create
-directory** button appears.
+does not exist. If either path's parent directory does not exist, a red
+validation message is shown — create the directory on disk first, then save.
 
 **Default rule thresholds** — the same thresholds described in Step 6 above,
 applied globally. Dataset-level overrides take precedence.

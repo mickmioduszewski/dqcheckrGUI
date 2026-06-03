@@ -8,14 +8,18 @@ make_report_filename <- function(dataset_name, run_timestamp) {
   paste0(dataset_name, "_", ts_slug, ".html")
 }
 
-status_badge <- function(status) {
-  cfg <- switch(as.character(status),
+.status_cfg <- function(status) {
+  switch(as.character(status),
     PASS    = list(bg="#5cb85c", sym="✓", text="PASS"),
     WARN    = list(bg="#f0ad4e", sym="⚠", text="WARN"),
     FAIL    = list(bg="#d9534f", sym="✗", text="FAIL"),
     RUNNING = list(bg="#337ab7", sym="●", text="RUNNING"),
     list(bg="#999999", sym="—", text=as.character(status %||% ""))
   )
+}
+
+status_badge <- function(status) {
+  cfg <- .status_cfg(status)
   tags$span(
     style=sprintf("background:%s;color:#fff;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;white-space:nowrap;", cfg$bg),
     paste(cfg$sym, cfg$text)
@@ -23,13 +27,7 @@ status_badge <- function(status) {
 }
 
 status_badge_html <- function(status) {
-  cfg <- switch(as.character(status),
-    PASS    = list(bg="#5cb85c", sym="✓", text="PASS"),
-    WARN    = list(bg="#f0ad4e", sym="⚠", text="WARN"),
-    FAIL    = list(bg="#d9534f", sym="✗", text="FAIL"),
-    RUNNING = list(bg="#337ab7", sym="●", text="RUNNING"),
-    list(bg="#999999", sym="—", text=as.character(status %||% ""))
-  )
+  cfg <- .status_cfg(status)
   sprintf('<span style="background:%s;color:#fff;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;">%s %s</span>',
           cfg$bg, cfg$sym, cfg$text)
 }

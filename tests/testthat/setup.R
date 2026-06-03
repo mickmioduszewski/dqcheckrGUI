@@ -103,6 +103,11 @@ wait_for_next_enabled <- function(app, timeout_ms = 12000) {
 
 # Navigate the wizard from from_step to to_step.
 # Waits for Next to be enabled before each click so timing issues don't stall navigation.
+open_new_wizard <- function(app) {
+  app$click("btn_new_dataset")
+  app$wait_for_idle()
+}
+
 wizard_go_to_step <- function(app, to_step, from_step = 1L) {
   clicks <- to_step - from_step
   if (clicks <= 0L) return(invisible(NULL))

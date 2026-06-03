@@ -4,11 +4,6 @@ library(testthat)
 library(shinytest2)
 library(yaml)
 
-open_new_wizard <- function(app) {
-  app$click("btn_new_dataset")
-  app$wait_for_idle()
-}
-
 # ── New wizard: folder mode ───────────────────────────────────────────────────
 
 test_that("new wizard (folder mode) saves correct YAML with folder key", {

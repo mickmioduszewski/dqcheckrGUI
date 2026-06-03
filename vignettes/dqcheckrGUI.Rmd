@@ -172,9 +172,8 @@ This step identifies the file's format and column layout. The top of the screen
 shows a raw text preview of the first 50 lines of the file — the full file is
 never loaded.
 
-**Auto-detection**: when a file is loaded, the app runs DuckDB's `sniff_csv()`
-and `readr::guess_encoding()` to detect the delimiter, encoding, quote
-character, and whether the first row is a header. Results are shown as an
+**Auto-detection**: when a file is loaded, the app uses `readr` to detect the
+delimiter, encoding, quote character, and whether the first row is a header. Results are shown as an
 editable confirmation panel — you always make the final call, nothing is
 silently committed.
 

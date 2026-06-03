@@ -2,11 +2,35 @@
 
 sniff_csv_file <- function(path) {
   tryCatch({
-    con <- duckdb::dbConnect(duckdb::duckdb(), ":memory:")
-    on.exit(duckdb::dbDisconnect(con, shutdown=TRUE), add=TRUE)
-    path_esc <- gsub("'", "''", path)
-    DBI::dbGetQuery(con, sprintf("FROM sniff_csv('%s', sample_size=500)", path_esc))
-  }, error=function(e) NULL)
+    lines <- readLines(path, n = 20, warn = FALSE)
+    lines <- lines[nchar(trimws(lines)) > 0]
+    if (length(lines) < 1) return(NULL)
+
+    candidates <- c(",", "\t", ";", "|", ":")
+    best_delim <- ","
+    best_score <- 0
+    for (d in candidates) {
+      counts <- vapply(lines, function(l) length(strsplit(l, d, fixed = TRUE)[[1]]), integer(1))
+      n_cols  <- stats::median(counts)
+      if (n_cols > 1) {
+        score <- (n_cols - 1) * mean(counts == n_cols)
+        if (score > best_score) { best_score <- score; best_delim <- d }
+      }
+    }
+
+    first_fields <- strsplit(lines[1], best_delim, fixed = TRUE)[[1]]
+    has_header <- all(is.na(suppressWarnings(as.numeric(trimws(first_fields)))))
+
+    df <- readr::read_delim(path, delim = best_delim,
+                            col_names = has_header,
+                            col_types = readr::cols(.default = "c"),
+                            n_max = 500, show_col_types = FALSE)
+
+    list(delimiter  = best_delim,
+         has_header = has_header,
+         col_names  = names(df),
+         col_types  = vapply(df, infer_col_type_simple, character(1)))
+  }, error = function(e) NULL)
 }
 
 load_raw_preview <- function(session, path, wiz) {
@@ -108,30 +132,18 @@ server_step3_csv <- function(input, output, session, wiz) {
     req(nchar(path %||% "") > 0)
 
     sniff <- sniff_csv_file(path)
-    if (!is.null(sniff) && nrow(sniff) > 0) {
-      # Delimiter
-      detected_delim <- sniff$Delimiter[1] %||% ","
-      if (detected_delim %in% c(",","\t",";","|"," ",":")) {
-        updateSelectInput(session, "wiz_delimiter", selected=detected_delim)
+    if (!is.null(sniff)) {
+      detected_delim <- sniff$delimiter %||% ","
+      if (detected_delim %in% c(",", "\t", ";", "|", " ", ":")) {
+        updateSelectInput(session, "wiz_delimiter", selected = detected_delim)
         wiz$delimiter <- detected_delim
       }
-      # Header
-      has_hdr <- isTRUE(sniff$HasHeader[1])
-      updateRadioButtons(session, "wiz_has_header", selected=as.character(has_hdr))
+      has_hdr <- isTRUE(sniff$has_header)
+      updateRadioButtons(session, "wiz_has_header", selected = as.character(has_hdr))
       wiz$has_header <- has_hdr
-
-      # Column names and types from sniff
-      cols_raw <- sniff$Columns[1]
-      if (!is.null(cols_raw) && is.character(cols_raw)) {
-        # DuckDB returns Columns as a JSON-like string; parse it
-        # Format: [{name: x, type: y}, ...]
-        col_data <- tryCatch({
-          jsonlite::fromJSON(cols_raw)
-        }, error=function(e) NULL)
-        if (!is.null(col_data) && is.data.frame(col_data)) {
-          wiz$sniff_col_names <- col_data$name
-          wiz$sniff_col_types <- col_data$type
-        }
+      if (!is.null(sniff$col_names)) {
+        wiz$sniff_col_names <- sniff$col_names
+        wiz$sniff_col_types <- sniff$col_types
       }
     }
 

@@ -63,11 +63,7 @@ read_snapshot_history <- function(db_path, dataset_name = NULL, n = 10) {
   if (is.null(db_path) || db_path == "" || !safe_file_exists(db_path)) return(empty)
 
   tryCatch({
-    con <- if (grepl("\\.duckdb$", db_path, ignore.case=TRUE)) {
-      duckdb::dbConnect(duckdb::duckdb(), db_path, read_only=TRUE)
-    } else {
-      DBI::dbConnect(RSQLite::SQLite(), db_path)
-    }
+    con <- DBI::dbConnect(RSQLite::SQLite(), db_path)
     on.exit(DBI::dbDisconnect(con), add=TRUE)
 
     if (!is.null(dataset_name) && dataset_name != "") {

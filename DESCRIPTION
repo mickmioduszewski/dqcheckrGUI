@@ -31,11 +31,9 @@ Imports:
     DT,
     callr,
     yaml,
-    duckdb,
     readr,
     DBI,
     glue,
-    jsonlite,
     RSQLite
 Suggests:
     testthat (>= 3.1.0),

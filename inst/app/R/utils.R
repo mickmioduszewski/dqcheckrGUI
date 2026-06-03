@@ -118,3 +118,9 @@ make_ruler_string <- function(max_chars = 120) {
 global_config_path <- function(config_dir) {
   file.path(config_dir, "dqcheckr.yml")
 }
+
+# Convert a UTC ISO timestamp (from the snapshot DB) to a local-time display string.
+utc_to_local_display <- function(ts) {
+  parsed <- as.POSIXct(ts, format = "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
+  format(parsed, format = "%Y-%m-%d %H:%M:%S", tz = "")
+}

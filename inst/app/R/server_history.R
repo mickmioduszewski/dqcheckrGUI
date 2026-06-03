@@ -46,7 +46,7 @@ server_history <- function(input, output, session, rv, config_dir, gcfg_rv) {
         '<input type="checkbox" class="hist-check" data-id="%d" data-ds="%s" onchange="window.__dqHC(this)"/>',
         df$id, df$dataset_name),
       Dataset = df$dataset_name,
-      Date    = df$run_timestamp,
+      Date    = utc_to_local_display(df$run_timestamp),
       File    = df$file_name,
       Status  = vapply(df$overall_status, status_badge_html, character(1)),
       Fails   = df$check_fail_count,

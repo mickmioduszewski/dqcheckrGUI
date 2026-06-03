@@ -39,9 +39,7 @@ server_history <- function(input, output, session, rv, config_dir, gcfg_rv) {
     }
 
     # Build direct /dq_reports/<file> links — avoids Shiny round-trip and popup blocking
-    ts_raw   <- gsub("[^0-9]", "", substr(df$run_timestamp, 1, 19))
-    ts_slug  <- paste0(substr(ts_raw, 1, 8), "_", substr(ts_raw, 9, 14))
-    filename <- paste0(df$dataset_name, "_", ts_slug, ".html")
+    filename <- make_report_filename(df$dataset_name, df$run_timestamp)
 
     display_df <- data.frame(
       ` ` = sprintf(

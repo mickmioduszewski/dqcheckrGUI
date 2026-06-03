@@ -241,6 +241,20 @@ server_step3_csv <- function(input, output, session, wiz) {
     wiz$fwf_col_names <- names_vec
   })
 
+  # Collect FWF column types from inputs
+  observe({
+    n <- length(wiz$fwf_widths)
+    if (n == 0) return()
+    col_names <- wiz$fwf_col_names
+    types_vec <- character(n)
+    for (i in seq_len(n)) {
+      v <- input[[paste0("fwf_col_type_", i)]]
+      types_vec[i] <- if (!is.null(v)) v else "character"
+    }
+    names(types_vec) <- if (length(col_names) == n) col_names else paste0("col_", seq_len(n))
+    wiz$col_types_inferred <- types_vec
+  })
+
   # FWF record length badge
   output$fwf_record_length_badge <- renderUI({
     req(length(wiz$fwf_widths) > 0, length(wiz$raw_lines) > 0)

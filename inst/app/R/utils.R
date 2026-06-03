@@ -2,6 +2,12 @@
 
 `%||%` <- function(a, b) if (!is.null(a) && length(a) > 0 && !is.na(a[1]) && a[1] != "") a else b
 
+make_report_filename <- function(dataset_name, run_timestamp) {
+  ts_raw  <- gsub("[^0-9]", "", substr(run_timestamp, 1, 19))
+  ts_slug <- paste0(substr(ts_raw, 1, 8), "_", substr(ts_raw, 9, 14))
+  paste0(dataset_name, "_", ts_slug, ".html")
+}
+
 status_badge <- function(status) {
   cfg <- switch(as.character(status),
     PASS    = list(bg="#5cb85c", sym="✓", text="PASS"),
@@ -64,15 +70,19 @@ read_snapshot_history <- function(db_path, dataset_name = NULL, n = 10) {
     }
     on.exit(DBI::dbDisconnect(con), add=TRUE)
 
-    where_clause <- if (!is.null(dataset_name) && dataset_name != "")
-      sprintf("WHERE dataset_name = '%s'", gsub("'", "''", dataset_name))
-    else ""
-    limit_clause <- sprintf("ORDER BY id DESC LIMIT %d", n)
-
-    DBI::dbGetQuery(con, sprintf(
-      "SELECT id, dataset_name, file_name, run_timestamp,
-              overall_status, check_fail_count, check_warn_count, row_count
-       FROM snapshots %s %s", where_clause, limit_clause))
+    if (!is.null(dataset_name) && dataset_name != "") {
+      DBI::dbGetQuery(con,
+        "SELECT id, dataset_name, file_name, run_timestamp,
+                overall_status, check_fail_count, check_warn_count, row_count
+         FROM snapshots WHERE dataset_name = ? ORDER BY id DESC LIMIT ?",
+        list(dataset_name, as.integer(n)))
+    } else {
+      DBI::dbGetQuery(con,
+        "SELECT id, dataset_name, file_name, run_timestamp,
+                overall_status, check_fail_count, check_warn_count, row_count
+         FROM snapshots ORDER BY id DESC LIMIT ?",
+        list(as.integer(n)))
+    }
   }, error = function(e) empty)
 }
 

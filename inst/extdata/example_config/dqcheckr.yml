@@ -1,5 +1,5 @@
-snapshot_db: "../dqr/dqcheckr/inst/demonstrations/output2/snapshots.sqlite"
-report_output_dir: "../dqr/dqcheckr/inst/demonstrations/output2/reports/"
+snapshot_db: "data/snapshots.sqlite"
+report_output_dir: "reports/"
 
 default_rules:
   type_inference_threshold: 0.90

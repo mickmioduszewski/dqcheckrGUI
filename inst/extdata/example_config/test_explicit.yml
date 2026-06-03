@@ -2,7 +2,7 @@ dataset_name: test_explicit
 format: csv
 encoding: ASCII
 delimiter: ','
-current_file: /Users/mick/Documents/code-testvarious/dataset quality check/dqr/dqcheckr/inst/demonstrations/data2/starwars_v1.csv
+current_file: "data/starwars_v1.csv"
 expected_columns:
 - name
 - height

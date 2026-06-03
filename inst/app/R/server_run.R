@@ -63,15 +63,15 @@ server_run <- function(input, output, session, rv, config_dir, gcfg_rv) {
     }
   })
 
-  # Enable/disable run button based on pre-run check
-  observe({
-    req(input$run_dataset)
-    ds <- input$run_dataset
-    cd <- config_dir()
-    cfg_path <- file.path(cd, paste0(ds, ".yml"))
-    ok <- safe_file_exists(cfg_path) && rv_run$status != "running"
-    shinyjs_toggle <- if (ok) "enable" else "disable"
-    # Use updateActionButton workaround
+  # Run button — disabled while a run is in progress
+  output$run_start_btn <- renderUI({
+    ds  <- input$run_dataset
+    cd  <- config_dir()
+    ok  <- !is.null(ds) && nchar(ds) > 0 &&
+           safe_file_exists(file.path(cd, paste0(ds, ".yml"))) &&
+           rv_run$status != "running"
+    btn <- actionButton("run_start", "▶ Run check", class = "btn btn-primary")
+    if (!ok) tagAppendAttributes(btn, disabled = "disabled") else btn
   })
 
   # Run start

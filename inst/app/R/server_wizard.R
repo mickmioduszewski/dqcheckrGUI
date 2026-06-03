@@ -51,19 +51,39 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
         }
       }
     } else {
-      # Reset
-      wiz$mode="new"; wiz$dataset_name=""; wiz$description=""
-      wiz$file_mode="folder"; wiz$folder=""; wiz$current_file=""; wiz$previous_file=""
-      wiz$format="csv"; wiz$encoding="UTF-8"; wiz$delimiter=","
-      wiz$has_header=TRUE; wiz$col_names=character(0); wiz$col_types_inferred=character(0)
-      wiz$col_types_override=list(); wiz$key_columns=character(0)
-      wiz$expected_columns=character(0); wiz$fwf_widths=integer(0)
-      wiz$fwf_col_names=character(0); wiz$fwf_skip=0L; wiz$column_rules=list()
-      wiz$rule_overrides=list(); wiz$custom_checks_file=""
-      wiz$extra_keys=list(); wiz$current_step=1L; wiz$step_valid=rep(FALSE,8L)
-      wiz$raw_lines=character(0); wiz$current_preview_path=""
-      wiz$csv_preview_df=NULL; wiz$fwf_preview_df=NULL
-      wiz$fwf_widths=integer(0); wiz$fwf_col_names=character(0)
+      defaults <- list(
+        mode                 = "new",
+        dataset_name         = "",
+        description          = "",
+        file_mode            = "folder",
+        folder               = "",
+        current_file         = "",
+        previous_file        = "",
+        format               = "csv",
+        encoding             = "UTF-8",
+        delimiter            = ",",
+        quote_char           = '"',
+        has_header           = TRUE,
+        col_names            = character(0),
+        col_types_inferred   = character(0),
+        col_types_override   = list(),
+        key_columns          = character(0),
+        expected_columns     = character(0),
+        fwf_widths           = integer(0),
+        fwf_col_names        = character(0),
+        fwf_skip             = 0L,
+        column_rules         = list(),
+        rule_overrides       = list(),
+        custom_checks_file   = "",
+        extra_keys           = list(),
+        current_step         = 1L,
+        step_valid           = rep(FALSE, 8L),
+        raw_lines            = character(0),
+        current_preview_path = "",
+        csv_preview_df       = NULL,
+        fwf_preview_df       = NULL
+      )
+      for (nm in names(defaults)) wiz[[nm]] <- defaults[[nm]]
     }
     rv$wizard_open <- TRUE
     rv$active_section <- "wizard"

@@ -1,7 +1,7 @@
 # YAML config round-trip with unknown-key preservation (spec §20)
 
 KNOWN_KEYS <- c(
-  "dataset_name","format","encoding","delimiter","folder",
+  "dataset_name","format","encoding","delimiter","quote_char","col_names","folder",
   "current_file","previous_file","fwf_widths","fwf_col_names","fwf_skip",
   "expected_columns","key_columns","column_types","column_rules",
   "rule_overrides","custom_checks_file","snapshot_db","report_output_dir",
@@ -78,6 +78,10 @@ build_config_list <- function(wiz) {
 
   if (wiz$format == "csv") {
     cfg$delimiter <- wiz$delimiter
+    if (!is.null(wiz$quote_char) && wiz$quote_char != '"')
+      cfg$quote_char <- wiz$quote_char
+    if (isFALSE(wiz$has_header) && length(wiz$col_names) > 0)
+      cfg$col_names <- as.list(wiz$col_names)
   }
 
   if (wiz$file_mode == "folder") {

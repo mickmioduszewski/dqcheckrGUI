@@ -34,14 +34,15 @@ Imports:
     duckdb,
     readr,
     DBI,
-    glue
+    glue,
+    jsonlite,
+    RSQLite
 Suggests:
     testthat (>= 3.1.0),
     knitr,
     rmarkdown,
     shinytest2,
-    withr,
-    RSQLite
+    withr
 VignetteBuilder: knitr
 Config/testthat/edition: 3
 Config/roxygen2/version: 8.0.0

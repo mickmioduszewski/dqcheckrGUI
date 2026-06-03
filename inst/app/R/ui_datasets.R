@@ -28,9 +28,7 @@ ui_dataset_panel <- function(dataset_name, config, last_runs, gcfg) {
       p(class="text-muted fst-italic", "No runs recorded yet.")
     } else {
       local({
-        ts_raw   <- gsub("[^0-9]", "", substr(last_runs$run_timestamp, 1, 19))
-        ts_slug  <- paste0(substr(ts_raw, 1, 8), "_", substr(ts_raw, 9, 14))
-        filename <- paste0(dataset_name, "_", ts_slug, ".html")
+        filename <- make_report_filename(dataset_name, last_runs$run_timestamp)
         ds_js    <- gsub("'", "\\'", dataset_name)
         tagList(
           DT::datatable(

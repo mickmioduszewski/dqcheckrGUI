@@ -79,7 +79,8 @@ wizard_step3_ui <- function() {
     div(class="mt-3",
       h6("Parsed preview"),
       uiOutput("step3_no_header_naming"),
-      uiOutput("step3_parsed_preview")
+      uiOutput("step3_parsed_preview"),
+      reactable::reactableOutput("step3_fwf_preview")
     )
   )
 }

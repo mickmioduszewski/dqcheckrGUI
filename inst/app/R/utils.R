@@ -117,6 +117,16 @@ global_config_path <- function(config_dir) {
   file.path(config_dir, "dqcheckr.yml")
 }
 
+# Register (or re-register) the reports directory as the "dq_reports" static
+# resource path. Re-registering with a new path replaces the old mapping, so
+# this must be called again whenever report_output_dir changes at runtime.
+register_report_resource_path <- function(report_output_dir) {
+  report_dir <- normalizePath(report_output_dir %||% "reports/", mustWork = FALSE)
+  if (dir.exists(report_dir)) {
+    addResourcePath("dq_reports", report_dir)
+  }
+}
+
 # Convert a UTC ISO timestamp (from the snapshot DB) to a local-time display string.
 utc_to_local_display <- function(ts) {
   parsed <- as.POSIXct(ts, format = "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")

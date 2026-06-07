@@ -92,11 +92,26 @@
         ],
         listeners: {
           move: function(evt) {
-            var curX = parseFloat(evt.target.getAttribute('x1')) + evt.dx;
-            curX = Math.max(_charWidth, curX);
-            var newChar = Math.round(curX / _charWidth);
-            evt.target.setAttribute('x1', charPosToX(newChar));
-            evt.target.setAttribute('x2', charPosToX(newChar));
+            // x1/x2 are stored in *on-screen* SVG coordinates, which
+            // setupScrollSync keeps equal to charPosToX(data-char) minus
+            // the current horizontal scroll offset. Convert back to
+            // absolute character-grid coordinates before snapping —
+            // otherwise, once the view has been scrolled, the resulting
+            // char position is off by `scrollLeft / _charWidth`. Then
+            // re-apply the offset when writing the display position back,
+            // so it stays consistent with how scroll sync renders lines
+            // (and the line doesn't visually jump on the next scroll).
+            var wrap = document.getElementById('fwf-ruler-wrap');
+            var scroller = wrap ? wrap.querySelector('.ace_scroller') : null;
+            var scrollLeft = scroller ? scroller.scrollLeft : 0;
+
+            var curXAbsolute = parseFloat(evt.target.getAttribute('x1')) + scrollLeft + evt.dx;
+            curXAbsolute = Math.max(_charWidth, curXAbsolute);
+            var newChar = Math.round(curXAbsolute / _charWidth);
+
+            var displayX = charPosToX(newChar) - scrollLeft;
+            evt.target.setAttribute('x1', displayX);
+            evt.target.setAttribute('x2', displayX);
             evt.target.setAttribute('data-char', newChar);
           },
           end: function() {
@@ -234,10 +249,24 @@
     }
   }
 
-  // Re-init when Shiny reconnects
+  // Re-init when Shiny reconnects, or when the step 3 UI has been torn
+  // down and rebuilt (e.g. wizard navigation destroys #fwf-ruler-wrap and
+  // its SVG overlay). `msg.positions`, if provided, is a list of 0-based
+  // char positions to redraw — restoring boundaries the user had already
+  // placed before the overlay was destroyed and recreated. Restoring is
+  // bundled into the same setTimeout as initRuler() (rather than sent as
+  // a separate fwf_restore_boundaries message) to avoid a race where the
+  // restore arrives before _svgEl exists and silently no-ops.
   if (window.Shiny) {
-    Shiny.addCustomMessageHandler('fwf_reinit', function() {
-      setTimeout(initRuler, 100);
+    Shiny.addCustomMessageHandler('fwf_reinit', function(msg) {
+      setTimeout(function() {
+        initRuler();
+        if (msg && msg.positions && msg.positions.length) {
+          clearBoundaries();
+          msg.positions.forEach(function(p) { createLine(p); });
+          sendBoundariesToShiny();
+        }
+      }, 100);
     });
   }
 

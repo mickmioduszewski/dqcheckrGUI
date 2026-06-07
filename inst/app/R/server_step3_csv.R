@@ -2,7 +2,7 @@
 
 sniff_csv_file <- function(path) {
   tryCatch({
-    lines <- readLines(path, n = 20, warn = FALSE)
+    lines <- readLines(path, n = 100, warn = FALSE)
     lines <- lines[nchar(trimws(lines)) > 0]
     if (length(lines) < 1) return(NULL)
 
@@ -125,43 +125,160 @@ server_step3_csv <- function(input, output, session, wiz) {
     }
   })
 
-  # Auto-run sniff when file loaded
+  # Auto-run sniff when file loaded.
+  # New mode: auto-apply sniffed values (no config to preserve).
+  # Edit mode: compare sniffed vs config-loaded; surface conflicts at step 3 without
+  # overwriting. The user decides per-field whether to keep the config value or adopt
+  # the detected one.
   observe({
     req(length(wiz$raw_lines) > 0)
     path <- wiz$current_preview_path
     req(nchar(path %||% "") > 0)
 
     sniff <- sniff_csv_file(path)
-    if (!is.null(sniff)) {
-      detected_delim <- sniff$delimiter %||% ","
-      if (detected_delim %in% c(",", "\t", ";", "|", " ", ":")) {
-        updateSelectInput(session, "wiz_delimiter", selected = detected_delim)
-        wiz$delimiter <- detected_delim
+
+    if (!is.null(sniff) && !is.null(sniff$col_names)) {
+      wiz$sniff_col_names <- sniff$col_names
+      wiz$sniff_col_types <- sniff$col_types
+    }
+
+    enc_raw <- tryCatch(readr::guess_encoding(path), error = function(e) NULL)
+    top_enc     <- NULL
+    enc_choices <- NULL
+    if (!is.null(enc_raw) && nrow(enc_raw) > 0) {
+      top_enc <- enc_raw$encoding[1]
+      enc_choices <- unique(c(
+        setNames(enc_raw$encoding[seq_len(min(3, nrow(enc_raw)))],
+                 sprintf("%s (%.0f%%)", enc_raw$encoding[seq_len(min(3, nrow(enc_raw)))],
+                         enc_raw$confidence[seq_len(min(3, nrow(enc_raw)))] * 100)),
+        c("UTF-8" = "UTF-8", "ISO-8859-1" = "ISO-8859-1",
+          "Windows-1252" = "Windows-1252", "UTF-16LE" = "UTF-16LE", "CP1250" = "CP1250")
+      ))
+      wiz$encoding_choices <- enc_choices
+    }
+
+    if (isTRUE(wiz$mode == "edit")) {
+      conflicts <- list()
+
+      if (!is.null(sniff) && isTRUE(wiz$format == "csv")) {
+        detected_delim <- sniff$delimiter %||% ","
+        if (detected_delim %in% c(",", "\t", ";", "|", " ", ":") &&
+            detected_delim != (wiz$delimiter %||% ",")) {
+          conflicts[["delimiter"]] <- list(
+            field       = "delimiter",
+            config_val  = wiz$delimiter %||% ",",
+            sniffed_val = detected_delim,
+            label       = "Delimiter"
+          )
+        }
+        sniff_hdr <- isTRUE(sniff$has_header)
+        if (sniff_hdr != isTRUE(wiz$has_header)) {
+          conflicts[["has_header"]] <- list(
+            field       = "has_header",
+            config_val  = isTRUE(wiz$has_header),
+            sniffed_val = sniff_hdr,
+            label       = "Header row"
+          )
+        }
       }
-      has_hdr <- isTRUE(sniff$has_header)
-      updateRadioButtons(session, "wiz_has_header", selected = as.character(has_hdr))
-      wiz$has_header <- has_hdr
-      if (!is.null(sniff$col_names)) {
-        wiz$sniff_col_names <- sniff$col_names
-        wiz$sniff_col_types <- sniff$col_types
+
+      if (!is.null(top_enc) && top_enc != (wiz$encoding %||% "UTF-8")) {
+        conflicts[["encoding"]] <- list(
+          field       = "encoding",
+          config_val  = wiz$encoding %||% "UTF-8",
+          sniffed_val = top_enc,
+          label       = "Encoding"
+        )
+      }
+
+      if (!is.null(enc_choices))
+        updateSelectInput(session, "wiz_encoding",
+                          choices  = enc_choices,
+                          selected = wiz$encoding %||% "UTF-8")
+      wiz$sniff_conflicts <- conflicts
+
+    } else {
+      if (!is.null(sniff)) {
+        detected_delim <- sniff$delimiter %||% ","
+        if (detected_delim %in% c(",", "\t", ";", "|", " ", ":")) {
+          updateSelectInput(session, "wiz_delimiter", selected = detected_delim)
+          wiz$delimiter <- detected_delim
+        }
+        has_hdr <- isTRUE(sniff$has_header)
+        updateRadioButtons(session, "wiz_has_header", selected = as.character(has_hdr))
+        wiz$has_header <- has_hdr
+      }
+      if (!is.null(enc_choices) && !is.null(top_enc)) {
+        updateSelectInput(session, "wiz_encoding", choices = enc_choices, selected = top_enc)
+        wiz$encoding <- top_enc
+      }
+    }
+  })
+
+  # Conflict banner — shown at step 3 in edit mode when sniffed values differ from config
+  output$step3_sniff_conflicts <- renderUI({
+    conflicts <- wiz$sniff_conflicts
+    if (length(conflicts) == 0) return(NULL)
+
+    fmt_val <- function(field, val) {
+      if (field == "has_header") {
+        if (isTRUE(val)) "has header row" else "no header row"
+      } else {
+        as.character(val)
       }
     }
 
-    # Encoding
-    enc_raw <- tryCatch(readr::guess_encoding(path), error=function(e) NULL)
-    if (!is.null(enc_raw) && nrow(enc_raw) > 0) {
-      top_enc <- enc_raw$encoding[1]
-      choices <- unique(c(
-        setNames(enc_raw$encoding[seq_len(min(3,nrow(enc_raw)))],
-                 sprintf("%s (%.0f%%)", enc_raw$encoding[seq_len(min(3,nrow(enc_raw)))],
-                         enc_raw$confidence[seq_len(min(3,nrow(enc_raw)))]*100)),
-        c("UTF-8"="UTF-8","ISO-8859-1"="ISO-8859-1","Windows-1252"="Windows-1252",
-          "UTF-16LE"="UTF-16LE","CP1250"="CP1250")
-      ))
-      wiz$encoding_choices <- choices
-      updateSelectInput(session, "wiz_encoding", choices=choices, selected=top_enc)
-      wiz$encoding <- top_enc
-    }
+    panels <- lapply(conflicts, function(cf) {
+      div(class = "alert alert-warning p-2 mb-2", style = "font-size:12px;",
+        tags$strong(paste0(cf$label, " mismatch — ")),
+        sprintf("config says \"%s\", file looks like \"%s\".",
+                fmt_val(cf$field, cf$config_val),
+                fmt_val(cf$field, cf$sniffed_val)),
+        div(class = "mt-1 d-flex gap-2",
+          actionButton(paste0("sniff_keep_", cf$field),
+                       paste0("Keep config: ", fmt_val(cf$field, cf$config_val)),
+                       class = "btn btn-outline-secondary btn-sm",
+                       style = "font-size:11px; padding:2px 8px;"),
+          actionButton(paste0("sniff_use_", cf$field),
+                       paste0("Use detected: ", fmt_val(cf$field, cf$sniffed_val)),
+                       class = "btn btn-outline-primary btn-sm",
+                       style = "font-size:11px; padding:2px 8px;")
+        )
+      )
+    })
+    tagList(panels)
+  })
+
+  # Dismiss conflict — keep config value
+  observeEvent(input$sniff_keep_delimiter, {
+    cf <- wiz$sniff_conflicts; cf[["delimiter"]] <- NULL; wiz$sniff_conflicts <- cf
+  })
+  observeEvent(input$sniff_keep_has_header, {
+    cf <- wiz$sniff_conflicts; cf[["has_header"]] <- NULL; wiz$sniff_conflicts <- cf
+  })
+  observeEvent(input$sniff_keep_encoding, {
+    cf <- wiz$sniff_conflicts; cf[["encoding"]] <- NULL; wiz$sniff_conflicts <- cf
+  })
+
+  # Accept detected value and dismiss
+  observeEvent(input$sniff_use_delimiter, {
+    cf <- wiz$sniff_conflicts[["delimiter"]]; req(!is.null(cf))
+    wiz$delimiter <- cf$sniffed_val
+    updateSelectInput(session, "wiz_delimiter", selected = cf$sniffed_val)
+    cfs <- wiz$sniff_conflicts; cfs[["delimiter"]] <- NULL; wiz$sniff_conflicts <- cfs
+  })
+  observeEvent(input$sniff_use_has_header, {
+    cf <- wiz$sniff_conflicts[["has_header"]]; req(!is.null(cf))
+    v <- isTRUE(cf$sniffed_val)
+    wiz$has_header <- v
+    updateRadioButtons(session, "wiz_has_header", selected = as.character(v))
+    cfs <- wiz$sniff_conflicts; cfs[["has_header"]] <- NULL; wiz$sniff_conflicts <- cfs
+  })
+  observeEvent(input$sniff_use_encoding, {
+    cf <- wiz$sniff_conflicts[["encoding"]]; req(!is.null(cf))
+    wiz$encoding <- cf$sniffed_val
+    updateSelectInput(session, "wiz_encoding", selected = cf$sniffed_val)
+    cfs <- wiz$sniff_conflicts; cfs[["encoding"]] <- NULL; wiz$sniff_conflicts <- cfs
   })
 
   # Update wiz from inputs

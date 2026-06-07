@@ -76,6 +76,7 @@ server_global <- function(input, output, session, rv, config_dir, gcfg_rv) {
     )
     tryCatch({
       write_global_config(gcfg, global_config_path(config_dir()))
+      register_report_resource_path(gcfg$report_output_dir)
       gcfg_rv(gcfg)
       showNotification("Global config saved.", type="message", duration=3)
     }, error = function(e) {

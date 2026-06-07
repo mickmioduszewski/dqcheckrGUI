@@ -224,3 +224,51 @@ test_that("status_badge_html returns HTML span for unknown status", {
   result <- status_badge_html("UNKNOWN_STATUS")
   expect_match(result, "<span")
 })
+
+# ── utc_to_local_display ──────────────────────────────────────────────────────
+#
+# Production (dqr/dqcheckr/R/snapshot.R:211) writes run_timestamp to the
+# snapshot DB as format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"), e.g.
+# "2026-05-31T12:08:08Z". utc_to_local_display() parses *that* format with
+# as.POSIXct(..., tz = "UTC") and re-renders it in the session's local
+# timezone. Because the result depends on Sys.timezone(), each test fixes
+# the timezone with withr::local_timezone() so the expected string is
+# deterministic regardless of where the suite runs (and so DST edge cases
+# can be exercised deliberately).
+
+test_that("utc_to_local_display converts a production-format timestamp to local time (no DST)", {
+  withr::local_timezone("Australia/Sydney")
+  # 2026-06-01 falls in Sydney's non-DST period (AEST, UTC+10)
+  expect_equal(utc_to_local_display("2026-06-01T00:00:00Z"), "2026-06-01 10:00:00")
+})
+
+test_that("utc_to_local_display converts a production-format timestamp to local time (DST)", {
+  withr::local_timezone("America/New_York")
+  # 2026-06-01 falls in New York's DST period (EDT, UTC-4)
+  expect_equal(utc_to_local_display("2026-06-01T12:00:00Z"), "2026-06-01 08:00:00")
+})
+
+test_that("utc_to_local_display vectorises over multiple timestamps", {
+  withr::local_timezone("UTC")
+  result <- utc_to_local_display(c("2026-05-31T12:08:08Z", "2026-06-01T00:00:00Z"))
+  expect_equal(result, c("2026-05-31 12:08:08", "2026-06-01 00:00:00"))
+})
+
+test_that("utc_to_local_display returns NA for missing or unparseable input", {
+  withr::local_timezone("UTC")
+  expect_true(is.na(utc_to_local_display(NA_character_)))
+  expect_true(is.na(utc_to_local_display("not-a-timestamp")))
+})
+
+test_that("utc_to_local_display does not parse the space-separated timestamps used by some test fixtures", {
+  # Several fixtures elsewhere in this suite (e.g. test-history.R) use
+  # space-separated timestamps like "2026-05-31 12:08:08" rather than the
+  # production "T...Z" form. utc_to_local_display only understands the
+  # production format — a space-separated string silently parses to NA
+  # rather than producing a converted display string. Pinning that behaviour
+  # here so a future fixture rewrite that switches to production-format
+  # timestamps doesn't go unnoticed (and so nobody "fixes" this function to
+  # also accept the space form without realising real data never uses it).
+  withr::local_timezone("UTC")
+  expect_true(is.na(utc_to_local_display("2026-05-31 12:08:08")))
+})

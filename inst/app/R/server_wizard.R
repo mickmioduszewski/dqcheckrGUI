@@ -18,6 +18,7 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
     column_rules=list(), rule_overrides=list(),
     custom_checks_file="",
     extra_keys=list(),
+    sniff_conflicts=list(),
     current_step=1L,
     step_valid=rep(FALSE, 8L),
     raw_lines=character(0),
@@ -136,8 +137,24 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
     }
   })
 
+  # (Re-)activate the FWF ruler whenever step 3 becomes the visible step.
+  # `output$wizard_step_content` (above) rebuilds the entire step UI — and
+  # with it a fresh, empty `#fwf-ruler-wrap` / SVG overlay — on every step
+  # change, including backward navigation. So the JS-side ruler must be
+  # told to reattach (and redraw any previously-placed boundaries) every
+  # time we land on step 3, not just when advancing into it from step 2.
+  enter_fwf_step3 <- function() {
+    output$fwf_char_ruler_text <- renderText({ wiz$ruler_string })
+    positions <- if (length(wiz$fwf_starts) > 0)
+      as.list(as.integer(wiz$fwf_starts) - 1L) else list()
+    session$sendCustomMessage("fwf_reinit", list(positions = positions))
+  }
+
   observeEvent(input$wizard_back, {
-    if (wiz$current_step > 1) wiz$current_step <- wiz$current_step - 1L
+    if (wiz$current_step > 1) {
+      wiz$current_step <- wiz$current_step - 1L
+      if (wiz$current_step == 3L) enter_fwf_step3()
+    }
   })
 
   observeEvent(input$wizard_next, {
@@ -145,12 +162,7 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
     if (isTRUE(sv[wiz$current_step])) {
       collect_step_inputs(input, wiz, gcfg_rv())
       wiz$current_step <- wiz$current_step + 1L
-      # After advancing to step 3, re-init FWF ruler
-      if (wiz$current_step == 3L) {
-        session$sendCustomMessage("fwf_reinit", list())
-        # Restore ruler string
-        output$fwf_char_ruler_text <- renderText({ wiz$ruler_string })
-      }
+      if (wiz$current_step == 3L) enter_fwf_step3()
     }
   })
 

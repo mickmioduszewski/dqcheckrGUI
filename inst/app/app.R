@@ -13,9 +13,16 @@ library(readr)
 library(DBI)
 library(dqcheckr)
 
-# Source all R/ files
+# Source all R/ files into this script's own environment rather than the
+# global environment (source()'s `local=FALSE` default writes to .GlobalEnv,
+# which would dump every ui_*/server_*/helper function from R/ into the
+# user's workspace — a problem for anything sharing the R session, e.g.
+# running multiple apps, or tests that load this app via shinytest2/testthat).
+# `local=TRUE` sources into the calling frame: the same top-level environment
+# in which `ui()` and the `server` closure below are evaluated, so both still
+# resolve these definitions via ordinary lexical scoping.
 for (f in list.files(file.path(getwd(), "R"), pattern="\\.R$", full.names=TRUE)) {
-  source(f, local=FALSE)
+  source(f, local=TRUE)
 }
 
 # Config directory: env var override or working directory
@@ -30,13 +37,7 @@ local({
     read_global_config(global_config_path(get_config_dir())),
     error = function(e) list()
   )
-  report_dir <- normalizePath(
-    gcfg$report_output_dir %||% "reports/",
-    mustWork = FALSE
-  )
-  if (dir.exists(report_dir)) {
-    addResourcePath("dq_reports", report_dir)
-  }
+  register_report_resource_path(gcfg$report_output_dir)
 })
 
 # ── UI ────────────────────────────────────────────────────────────────

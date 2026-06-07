@@ -65,6 +65,7 @@ wizard_step3_ui <- function() {
 
     div(class="mt-3 p-3 border rounded bg-light",
       h6("File properties"),
+      uiOutput("step3_sniff_conflicts"),
       fluidRow(
         column(4,
           radioButtons("wiz_format", "Format",

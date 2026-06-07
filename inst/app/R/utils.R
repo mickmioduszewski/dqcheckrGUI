@@ -8,6 +8,20 @@ make_report_filename <- function(dataset_name, run_timestamp) {
   paste0(dataset_name, "_", ts_slug, ".html")
 }
 
+# Escape a string for safe embedding inside a single-quoted JavaScript string
+# literal — e.g. the dataset name interpolated into
+# onclick="Shiny.setInputValue('ds_action', {ds:'<name>', ...})". Backslashes
+# are escaped first so the backslash introduced for an escaped quote isn't
+# itself re-escaped by the second gsub. `is_valid_r_name()` keeps dataset
+# names alnum/underscore-only when created via the wizard, but names are
+# read back from filenames on disk (list_dataset_configs()) without
+# re-validation, so a manually placed/renamed config could carry characters
+# that would otherwise break out of the JS string literal.
+js_string_escape <- function(x) {
+  x <- gsub("\\\\", "\\\\\\\\", x)
+  gsub("'", "\\\\'", x)
+}
+
 .status_cfg <- function(status) {
   switch(as.character(status),
     PASS    = list(bg="#5cb85c", sym="✓", text="PASS"),
@@ -77,7 +91,11 @@ read_snapshot_history <- function(db_path, dataset_name = NULL, n = 10) {
          FROM snapshots ORDER BY id DESC LIMIT ?",
         list(as.integer(n)))
     }
-  }, error = function(e) empty)
+  }, error = function(e) {
+    message("read_snapshot_history: query failed for db_path '", db_path,
+            "': ", conditionMessage(e))
+    empty
+  })
 }
 
 read_all_snapshot_history <- function(db_path, n = 200) {

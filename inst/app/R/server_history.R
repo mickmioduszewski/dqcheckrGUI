@@ -134,8 +134,12 @@ server_history <- function(input, output, session, rv, config_dir, gcfg_rv) {
     if (is.null(result)) return()
 
     ds_name     <- rv_drift$ds_name
+    # Anchor to the exact "drift_<dataset>_<YYYYMMDD>_<HHMMSS>.html" slug shape
+    # (see make_report_filename(), utils.R) rather than a loose ".*" — a bare
+    # "^drift_<ds_name>_.*\\.html$" would also match e.g. "RBB_bonds"'s report
+    # when ds_name is "RBB", since "bonds_<timestamp>.html" satisfies ".*\\.html$".
     drift_files <- list.files(rv_drift$report_dir,
-                              pattern    = paste0("^drift_", ds_name, "_.*\\.html$"),
+                              pattern    = sprintf("^drift_%s_[0-9]{8}_[0-9]{6}\\.html$", ds_name),
                               full.names = FALSE)
     if (length(drift_files) > 0) {
       url <- paste0("/dq_reports/", drift_files[length(drift_files)])

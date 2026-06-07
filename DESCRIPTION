@@ -31,7 +31,9 @@ Imports:
     yaml,
     readr,
     DBI,
-    RSQLite
+    RSQLite,
+    stats,
+    tools
 Suggests:
     testthat (>= 3.1.0),
     knitr,

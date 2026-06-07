@@ -5,6 +5,10 @@ ui_dataset_panel <- function(dataset_name, config, last_runs, gcfg) {
   loc_str     <- if (nchar(config$known$folder %||% "") > 0)
                    config$known$folder
                  else config$known$current_file %||% "(not set)"
+  # Escaped once for every onclick JS-string interpolation below — see
+  # js_string_escape() for why this matters even though is_valid_r_name()
+  # constrains names created via the wizard.
+  ds_js <- js_string_escape(dataset_name)
 
   tagList(
     div(class="d-flex align-items-center gap-3 mb-3",
@@ -17,10 +21,10 @@ ui_dataset_panel <- function(dataset_name, config, last_runs, gcfg) {
     div(class="d-flex gap-2 mt-3 mb-4",
       tags$button("Edit config",
         class="btn btn-outline-secondary btn-sm",
-        onclick=sprintf("Shiny.setInputValue('ds_action', {action:'edit', ds:'%s', ts:Date.now()}, {priority:'event'});", dataset_name)),
+        onclick=sprintf("Shiny.setInputValue('ds_action', {action:'edit', ds:'%s', ts:Date.now()}, {priority:'event'});", ds_js)),
       tags$button("▶ Run check",
         class="btn btn-primary btn-sm",
-        onclick=sprintf("Shiny.setInputValue('ds_action', {action:'run', ds:'%s', ts:Date.now()}, {priority:'event'});", dataset_name))
+        onclick=sprintf("Shiny.setInputValue('ds_action', {action:'run', ds:'%s', ts:Date.now()}, {priority:'event'});", ds_js))
     ),
 
     h6("Recent runs", class="text-muted"),
@@ -29,14 +33,13 @@ ui_dataset_panel <- function(dataset_name, config, last_runs, gcfg) {
     } else {
       local({
         filename <- make_report_filename(dataset_name, last_runs$run_timestamp)
-        ds_js    <- gsub("'", "\\'", dataset_name)
         tagList(
           DT::datatable(
             data.frame(
               ` ` = sprintf(
                 '<input type="checkbox" class="drift-check" data-id="%d" data-ds="%s" onchange="window.__dqDC(\'%s\')"/>',
                 last_runs$id, dataset_name, ds_js),
-              Date   = last_runs$run_timestamp,
+              Date   = utc_to_local_display(last_runs$run_timestamp),
               File   = last_runs$file_name,
               Status = vapply(last_runs$overall_status, status_badge_html, character(1)),
               Fails  = last_runs$check_fail_count,
@@ -65,7 +68,7 @@ ui_dataset_panel <- function(dataset_name, config, last_runs, gcfg) {
     },
     div(class="mt-2",
       tags$a("View all in History →", href="#", class="btn btn-link btn-sm p-0",
-        onclick=sprintf("Shiny.setInputValue('ds_action', {action:'history', ds:'%s', ts:Date.now()}, {priority:'event'}); return false;", dataset_name))
+        onclick=sprintf("Shiny.setInputValue('ds_action', {action:'history', ds:'%s', ts:Date.now()}, {priority:'event'}); return false;", ds_js))
     )
   )
 }

@@ -632,8 +632,18 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
 
   observeEvent(input$wiz_custom_file, { wiz$custom_checks_file <- input$wiz_custom_file %||% "" })
 
+  # Debounce the custom-checks path before validating it — validation below
+  # parses *and sources* the file (to confirm it defines `custom_checks`),
+  # which executes the user's script. Without debouncing, that source() call
+  # — and any top-level side effects in the script (package loads, file/
+  # network I/O, global state changes) — would re-fire on every keystroke,
+  # including for every transient partial path typed along the way. Mirrors
+  # the folder_input_r/folder_input_d pattern used for the folder path above.
+  custom_file_r <- reactive({ input$wiz_custom_file })
+  custom_file_d <- shiny::debounce(custom_file_r, 600)
+
   output$step7_validation_badge <- renderUI({
-    path <- input$wiz_custom_file %||% ""
+    path <- custom_file_d() %||% ""
     if (nchar(path) == 0) return(NULL)
     if (!safe_file_exists(path))
       return(div(class="alert alert-danger p-1 mt-1", style="font-size:12px;",

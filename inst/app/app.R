@@ -126,7 +126,7 @@ shinyApp(
 
         tags$div(
           class=paste("dataset-item", if(active) "active"),
-          onclick=sprintf("Shiny.setInputValue('sidebar_dataset_click', '%s', {priority:'event'});", ds),
+          onclick=sprintf("Shiny.setInputValue('sidebar_dataset_click', '%s', {priority:'event'});", js_string_escape(ds)),
           span(ds, style="flex:1;"),
           if (nchar(status_text) > 0) status_badge(status_text)
         )

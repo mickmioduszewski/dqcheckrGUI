@@ -107,10 +107,26 @@ server_run <- function(input, output, session, rv, config_dir, gcfg_rv) {
 
     proc <- rv_run$r_process
     if (!is.null(proc) && !proc$is_alive()) {
-      result <- tryCatch(proc$get_result(), error=function(e) NULL)
+      # On failure, surface the *actual* cause — either the condition message
+      # from the background process, or (more often informative) the last
+      # non-blank line of its log — rather than a generic "check the log"
+      # message. Mirrors the pattern already used for drift failures in
+      # server_history.R's poll observer.
+      result <- tryCatch(proc$get_result(), error = function(e) {
+        last_line <- tryCatch({
+          lp <- rv_run$log_path
+          if (!is.null(lp) && file.exists(lp)) {
+            lines <- readLines(lp, warn = FALSE)
+            lines <- lines[nchar(trimws(lines)) > 0]
+            if (length(lines) > 0) tail(lines, 1) else ""
+          } else ""
+        }, error = function(e2) "")
+        msg <- if (nchar(last_line) > 0) last_line else conditionMessage(e)
+        rv_run$error_msg <- paste("Run failed:", msg)
+        NULL
+      })
       rv_run$status <- if (!is.null(result)) as.character(result$status) else "error"
       if (!is.null(result)) rv_run$report_path <- result$report_path
-      if (is.null(result))  rv_run$error_msg <- "Run ended with an error. Check the log."
       rv$history_refresh <- Sys.time()
     }
   })

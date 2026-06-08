@@ -11,10 +11,14 @@ This is a new submission.
 * macOS Tahoe 26.5 / aarch64-apple-darwin23, R 4.6.0, checked via
   `rcmdcheck::rcmdcheck(<built tarball>, args = "--as-cran")` (local):
   0 errors | 0 warnings | 2 notes
-* win-builder: R-devel, Windows Server 2022 (submitted 2026-06-08;
-  results pending — to be attached here once the results email arrives)
-* win-builder: R-release, Windows Server 2022 (submitted 2026-06-08;
-  results pending — to be attached here once the results email arrives)
+* win-builder: R-devel (R Under development (unstable), 2026-06-06 r90114
+  ucrt), Windows Server 2022: Status: 1 NOTE -- "Maintainer: 'Mick
+  Mioduszewski <mick@mioduszewski.net>' / New submission" (the standard
+  first-submission NOTE; 0 errors | 0 warnings)
+* win-builder: R-release (R 4.6.0, 2026-04-24 ucrt), Windows Server 2022:
+  Status: 1 NOTE -- "Maintainer: 'Mick Mioduszewski
+  <mick@mioduszewski.net>' / New submission" (the standard
+  first-submission NOTE; 0 errors | 0 warnings)
 
 ## Notes
 

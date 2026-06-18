@@ -24,8 +24,11 @@ This is a resubmission of version 0.1.0. The previous submission (also
 * macOS Tahoe 26.5 / aarch64-apple-darwin23, R 4.6.0, checked via
   `rcmdcheck::rcmdcheck(<built tarball>, args = "--as-cran")` (local):
   0 errors | 0 warnings | 2 notes
-* win-builder: R-devel and R-release, Windows Server 2022 (pending for this
-  resubmission)
+* win-builder: R-devel (R Under development (unstable), 2026-06-17 r90169
+  ucrt): Status 1 NOTE -- the standard "New submission" NOTE; 0 errors |
+  0 warnings
+* win-builder: R-release (R 4.6.0, 2026-04-24 ucrt): Status 1 NOTE -- the
+  standard "New submission" NOTE; 0 errors | 0 warnings
 
 ## Notes
 

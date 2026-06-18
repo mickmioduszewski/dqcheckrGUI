@@ -1,6 +1,5 @@
 # Unit tests for history utilities and report URL construction
 
-library(testthat)
 library(shiny)
 library(DBI)
 library(RSQLite)

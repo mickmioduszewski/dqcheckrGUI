@@ -1,7 +1,6 @@
 # Unit tests for R/config_io.R
 # These catch YAML round-trip bugs without needing a running Shiny app.
 
-library(testthat)
 library(yaml)
 
 # ── read_config: field reading ───────────────────────────────────────────────
@@ -259,4 +258,107 @@ test_that("write_config does not duplicate unknown keys as known fields", {
   raw <- yaml::read_yaml(path2)
   # extra_key should appear exactly once
   expect_equal(sum(names(raw) == "extra_key"), 1L)
+})
+
+# ── csv_skip / has_header inference (duplicate-header support, B-08) ───────────
+
+test_that("read_config: col_names + csv_skip>=1 means the file HAS a header", {
+  path <- write_yaml_fixture(list(
+    dataset_name = "refunds",
+    current_file = "/data/refunds.csv",
+    col_names    = list("PayeeName", "PayeeName_2", "Amount"),
+    csv_skip     = 1L
+  ))
+  k <- read_config(path)$known
+  expect_true(k$has_header)                       # NOT headerless
+  expect_equal(k$csv_skip, 1L)
+  expect_equal(k$col_names, c("PayeeName", "PayeeName_2", "Amount"))
+})
+
+test_that("read_config: col_names without csv_skip means genuinely headerless", {
+  path <- write_yaml_fixture(list(
+    dataset_name = "nohdr",
+    current_file = "/data/nohdr.csv",
+    col_names    = list("a", "b", "c")
+  ))
+  k <- read_config(path)$known
+  expect_false(k$has_header)
+  expect_equal(k$csv_skip, 0L)
+})
+
+test_that("read_config: no col_names means clean header (defaults)", {
+  path <- write_yaml_fixture(list(dataset_name = "clean", current_file = "/f.csv"))
+  k <- read_config(path)$known
+  expect_true(k$has_header)
+  expect_equal(k$csv_skip, 0L)
+  expect_equal(k$col_names, character(0))
+})
+
+test_that("build_config_list: renamed header writes col_names + csv_skip=1", {
+  wiz <- make_wiz(
+    file_mode        = "explicit", current_file = "/data/refunds.csv",
+    has_header       = TRUE,
+    raw_header_names = c("PayeeName", "PayeeName", "Amount"),   # file's real header
+    col_names        = c("PayeeName", "PayeeName_2", "Amount")  # user/suggested fix
+  )
+  cfg <- build_config_list(wiz)
+  expect_equal(unlist(cfg$col_names), c("PayeeName", "PayeeName_2", "Amount"))
+  expect_equal(cfg$csv_skip, 1L)
+})
+
+test_that("build_config_list: clean header writes neither col_names nor csv_skip", {
+  wiz <- make_wiz(
+    file_mode        = "explicit", current_file = "/data/clean.csv",
+    has_header       = TRUE,
+    raw_header_names = c("id", "name", "amount"),
+    col_names        = c("id", "name", "amount")               # unchanged
+  )
+  cfg <- build_config_list(wiz)
+  expect_null(cfg$col_names)
+  expect_null(cfg$csv_skip)
+})
+
+test_that("build_config_list: headerless writes col_names but no csv_skip", {
+  wiz <- make_wiz(
+    file_mode  = "explicit", current_file = "/data/nohdr.csv",
+    has_header = FALSE,
+    col_names  = c("a", "b", "c")
+  )
+  cfg <- build_config_list(wiz)
+  expect_equal(unlist(cfg$col_names), c("a", "b", "c"))
+  expect_null(cfg$csv_skip)
+})
+
+test_that("renamed-header config round-trips through write -> read -> rebuild (Gap 1)", {
+  # The cycle that a single-save test hides: a renamed-header config must come
+  # back as has_header = TRUE and re-serialise identically on the SECOND save.
+  wiz1 <- make_wiz(
+    dataset_name     = "refunds",
+    file_mode        = "explicit", current_file = "/data/refunds.csv",
+    has_header       = TRUE,
+    raw_header_names = c("PayeeName", "PayeeName", "Amount"),
+    col_names        = c("PayeeName", "PayeeName_2", "Amount")
+  )
+  path <- tempfile(fileext = ".yml")
+  write_config(wiz1, list(), path)
+  cfg1 <- yaml::read_yaml(path)
+  expect_equal(cfg1$csv_skip, 1L)
+
+  # Reopen (as the edit wizard would) — header presence must be restored.
+  k <- read_config(path)$known
+  expect_true(k$has_header)
+  expect_equal(k$col_names, c("PayeeName", "PayeeName_2", "Amount"))
+
+  # Reseed a wiz from the loaded config and re-serialise. On reopen the raw
+  # header probe would repopulate raw_header_names from the file; simulate that.
+  wiz2 <- make_wiz(
+    dataset_name     = "refunds",
+    file_mode        = "explicit", current_file = "/data/refunds.csv",
+    has_header       = k$has_header,
+    raw_header_names = c("PayeeName", "PayeeName", "Amount"),
+    col_names        = k$col_names
+  )
+  cfg2 <- build_config_list(wiz2)
+  expect_equal(unlist(cfg2$col_names), c("PayeeName", "PayeeName_2", "Amount"))
+  expect_equal(cfg2$csv_skip, 1L)   # NOT dropped on the second save
 })

@@ -37,7 +37,7 @@ local({
     read_global_config(global_config_path(get_config_dir())),
     error = function(e) list()
   )
-  register_report_resource_path(gcfg$report_output_dir)
+  register_report_resource_path(gcfg$report_output_dir, get_config_dir())
 })
 
 # ── UI ────────────────────────────────────────────────────────────────

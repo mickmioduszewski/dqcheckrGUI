@@ -1,7 +1,7 @@
 # YAML config round-trip with unknown-key preservation (spec §20)
 
 KNOWN_KEYS <- c(
-  "dataset_name","format","encoding","delimiter","quote_char","col_names","folder",
+  "dataset_name","format","encoding","delimiter","quote_char","col_names","csv_skip","folder",
   "current_file","previous_file","fwf_widths","fwf_col_names","fwf_skip",
   "expected_columns","key_columns","column_types","column_rules",
   "rule_overrides","custom_checks_file","snapshot_db","report_output_dir",
@@ -17,8 +17,14 @@ read_config <- function(path) {
     encoding           = raw$encoding %||% "UTF-8",
     delimiter          = raw$delimiter %||% ",",
     quote_char         = raw$quote_char %||% '"',
-    has_header         = is.null(raw$col_names),  # if col_names present → no header
+    # Header presence is the conjunction of two orthogonal facts. col_names may
+    # be present either because the file is genuinely headerless (csv_skip 0) OR
+    # because a usable-but-replaced header is being skipped (csv_skip >= 1). Only
+    # the former means "no header". Without this 3-way rule, a renamed-header
+    # config would round-trip to has_header = FALSE and lose csv_skip on re-save.
+    has_header         = is.null(raw$col_names) || (raw$csv_skip %||% 0L) >= 1L,
     col_names          = if (!is.null(raw$col_names)) unlist(raw$col_names) else character(0),
+    csv_skip           = as.integer(raw$csv_skip %||% 0L),
     folder             = raw$folder %||% "",
     current_file       = raw$current_file %||% "",
     previous_file      = raw$previous_file %||% "",
@@ -81,8 +87,25 @@ build_config_list <- function(wiz) {
     cfg$delimiter <- wiz$delimiter
     if (!is.null(wiz$quote_char) && wiz$quote_char != '"')
       cfg$quote_char <- wiz$quote_char
-    if (isFALSE(wiz$has_header) && length(wiz$col_names) > 0)
-      cfg$col_names <- as.list(wiz$col_names)
+
+    if (isFALSE(wiz$has_header)) {
+      # Genuinely headerless: names are user-supplied, no header line to skip.
+      if (length(wiz$col_names) > 0)
+        cfg$col_names <- as.list(wiz$col_names)
+    } else {
+      # Header present. Emit col_names + csv_skip = 1 ONLY when the names were
+      # changed away from the file's actual header (duplicate/invalid fixes or
+      # deliberate renames). A clean header — or one we couldn't probe — writes
+      # neither key, keeping the common case byte-identical to legacy output.
+      raw <- as.character(wiz$raw_header_names %||% character(0))
+      renamed <- length(raw) > 0 &&
+                 length(wiz$col_names) == length(raw) &&
+                 !identical(as.character(wiz$col_names), raw)
+      if (renamed) {
+        cfg$col_names <- as.list(wiz$col_names)
+        cfg$csv_skip  <- 1L
+      }
+    }
   }
 
   if (wiz$file_mode == "folder") {

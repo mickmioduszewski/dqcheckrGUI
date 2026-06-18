@@ -1,6 +1,5 @@
 # Integration tests: new dataset wizard
 
-library(testthat)
 library(shinytest2)
 library(yaml)
 

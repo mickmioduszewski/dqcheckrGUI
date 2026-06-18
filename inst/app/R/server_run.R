@@ -46,7 +46,8 @@ server_run <- function(input, output, session, rv, config_dir, gcfg_rv) {
       }
     }
 
-    db_path <- gcfg$snapshot_db %||% ""
+    db_path <- resolve_infra_path(gcfg$snapshot_db, cd,
+                                  default = "data/snapshots.sqlite", mustWork = FALSE)
     if (nchar(db_path) > 0) {
       db_parent <- dirname(db_path)
       if (!safe_dir_exists(db_parent))
@@ -91,6 +92,10 @@ server_run <- function(input, output, session, rv, config_dir, gcfg_rv) {
       args   = list(dn=ds, cd=cd),
       stdout = rv_run$log_path,
       stderr = "2>&1",
+      # Run in the deployment root so dqcheckr resolves relative snapshot_db /
+      # report_output_dir the same way the CLI does (shiny::runApp has changed
+      # this process's getwd() to the installed app directory).
+      wd      = deployment_root(cd),
       package = TRUE
     )
   })

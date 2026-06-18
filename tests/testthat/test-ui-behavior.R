@@ -1,7 +1,6 @@
 # Integration tests: UI behaviour
 # Covers interaction bugs found during manual testing.
 
-library(testthat)
 library(shinytest2)
 library(yaml)
 

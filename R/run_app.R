@@ -10,8 +10,8 @@
 #' @export
 #'
 #' @examples
-#' \dontrun{
-#' run_app()
+#' if (interactive()) {
+#'   run_app()
 #' }
 run_app <- function(...) {
   app_dir <- system.file("app", package = "dqcheckrGUI")

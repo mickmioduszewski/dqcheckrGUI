@@ -10,13 +10,14 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
     mode="new", dataset_name="", description="",
     file_mode="folder", folder="", current_file="", previous_file="",
     format="csv", encoding="UTF-8", delimiter=",", quote_char='"',
-    has_header=TRUE,
+    has_header=TRUE, csv_skip=0L,
     col_names=character(0), col_types_inferred=character(0),
+    raw_header_names=character(0), col_name_reasons=character(0),
     col_types_override=list(),
     key_columns=character(0), expected_columns=character(0),
     fwf_widths=integer(0), fwf_col_names=character(0), fwf_skip=0L,
     column_rules=list(), rule_overrides=list(),
-    custom_checks_file="",
+    custom_checks_file="", snapshot_db="", report_output_dir="",
     extra_keys=list(),
     sniff_conflicts=list(),
     current_step=1L,
@@ -106,11 +107,14 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
       line_len <- wiz$fwf_line_len %||% 80L
       valid[3] <- total > 0 && total <= line_len &&
                   length(wiz$fwf_col_names) > 0 &&
-                  all(nchar(wiz$fwf_col_names) > 0)
+                  all(nchar(wiz$fwf_col_names) > 0) &&
+                  all(is_valid_r_name(wiz$fwf_col_names)) &&
+                  !any(duplicated(wiz$fwf_col_names))
     } else {
       valid[3] <- length(wiz$col_names) > 0 &&
                   all(nchar(wiz$col_names) > 0) &&
-                  all(is_valid_r_name(wiz$col_names))
+                  all(is_valid_r_name(wiz$col_names)) &&
+                  !any(duplicated(wiz$col_names))
     }
     # Steps 4-8 are unlocked once step 3 is complete (col_names populated)
     step3_done <- isTRUE(valid[3])
@@ -721,20 +725,23 @@ collect_step_inputs <- function(input, wiz, gcfg) {
   # Rule overrides from step 6
   dr <- gcfg$default_rules %||% list()
   overrides <- list()
-  chk_num <- function(key, input_id, dflt) {
+  # Returns the input value if it is set and differs from the default, else NULL.
+  # Assigning NULL to an absent list key is a no-op, so only changed keys persist
+  # (a pure helper — avoids the `<<-` an accumulating closure would need).
+  chk_num <- function(input_id, dflt) {
     v <- input[[input_id]]
-    if (!is.null(v) && !is.na(v) && !identical(v, dflt)) overrides[[key]] <<- v
+    if (!is.null(v) && !is.na(v) && !identical(v, dflt)) v else NULL
   }
-  chk_num("max_missing_rate",               "wiz_ro_max_missing",    dr$max_missing_rate %||% 0.05)
-  chk_num("max_non_numeric_rate",           "wiz_ro_max_nonnumeric", dr$max_non_numeric_rate %||% 0.01)
-  chk_num("min_row_count",                  "wiz_ro_min_rows",       dr$min_row_count %||% 0)
+  overrides[["max_missing_rate"]]               <- chk_num("wiz_ro_max_missing",    dr$max_missing_rate %||% 0.05)
+  overrides[["max_non_numeric_rate"]]           <- chk_num("wiz_ro_max_nonnumeric", dr$max_non_numeric_rate %||% 0.01)
+  overrides[["min_row_count"]]                  <- chk_num("wiz_ro_min_rows",       dr$min_row_count %||% 0)
   v <- input$wiz_ro_max_rowchg;   dflt <- round((dr$max_row_count_change_pct %||% 0.10)*100,2)
   if (!is.null(v) && !is.na(v) && !identical(v, dflt)) overrides$max_row_count_change_pct <- v/100
   v <- input$wiz_ro_max_meanshift; dflt <- round((dr$max_numeric_mean_shift_pct %||% 0.20)*100,2)
   if (!is.null(v) && !is.na(v) && !identical(v, dflt)) overrides$max_numeric_mean_shift_pct <- v/100
-  chk_num("max_missing_rate_change_pp",     "wiz_ro_max_misschg",   dr$max_missing_rate_change_pp %||% 2.0)
-  chk_num("max_non_numeric_rate_change_pp", "wiz_ro_max_nonnumchg", dr$max_non_numeric_rate_change_pp %||% 1.0)
-  chk_num("type_inference_threshold",       "wiz_ro_type_inf",      dr$type_inference_threshold %||% 0.90)
+  overrides[["max_missing_rate_change_pp"]]     <- chk_num("wiz_ro_max_misschg",   dr$max_missing_rate_change_pp %||% 2.0)
+  overrides[["max_non_numeric_rate_change_pp"]] <- chk_num("wiz_ro_max_nonnumchg", dr$max_non_numeric_rate_change_pp %||% 1.0)
+  overrides[["type_inference_threshold"]]       <- chk_num("wiz_ro_type_inf",      dr$type_inference_threshold %||% 0.90)
   for (pair in list(
     list("flag_new_columns","wiz_ro_flag_new",TRUE),
     list("flag_dropped_columns","wiz_ro_flag_drop",TRUE),

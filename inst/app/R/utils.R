@@ -58,6 +58,66 @@ is_valid_r_name <- function(x) {
   grepl("^[a-zA-Z][a-zA-Z0-9_]*$", x)
 }
 
+# Coerce an arbitrary header token into a syntactically valid R name:
+# non-word chars → "_", collapse/trim underscores, prefix "col_" if it does
+# not start with a letter. Always returns something passing is_valid_r_name().
+sanitize_r_name <- function(x) {
+  x <- trimws(x %||% "")
+  x <- gsub("[^A-Za-z0-9_]", "_", x)
+  x <- gsub("_+", "_", x)
+  x <- sub("^_+", "", x)
+  x <- sub("_+$", "", x)
+  if (x == "" || !grepl("^[A-Za-z]", x)) x <- paste0("col_", x)
+  x <- sub("_+$", "", x)
+  if (x == "" || x == "col_") x <- "col"
+  x
+}
+
+# Given the raw (unmangled) header names of a CSV, produce a parallel list of
+# valid, unique suggestions plus a human-readable reason for each change.
+# Duplicate names get a positional suffix in first-appearance order
+# (1st → base, 2nd → base_2, 3rd → base_3); names invalid for other reasons
+# are sanitised. A final pass guarantees no suggestion collides with another.
+suggest_col_names <- function(raw_names) {
+  raw_names <- as.character(raw_names)
+  n <- length(raw_names)
+  out    <- character(n)
+  reason <- character(n)
+  taken  <- character(0)
+  for (i in seq_len(n)) {
+    raw  <- raw_names[i]
+    base <- sanitize_r_name(raw)
+    why  <- if (!identical(base, raw)) "invalid name — sanitised" else ""
+    occ  <- sum(raw_names[seq_len(i)] == raw)   # 1 for first, 2 for second, ...
+    cand <- base
+    if (occ > 1L) {
+      cand <- paste0(base, "_", occ)
+      why  <- sprintf("duplicate of column %d — suggested %s",
+                      match(raw, raw_names), cand)
+    }
+    bump <- occ
+    while (cand %in% taken) {
+      bump <- bump + 1L
+      cand <- paste0(base, "_", bump)
+      if (why == "") why <- sprintf("name collision — suggested %s", cand)
+    }
+    out[i]    <- cand
+    reason[i] <- why
+    taken     <- c(taken, cand)
+  }
+  list(names = out, reason = reason)
+}
+
+# Does the CSV at step 3 need the column-naming editor shown?
+# - headerless files: always (names are placeholders the user should set)
+# - header files: only when a raw header name is invalid or duplicated
+csv_needs_naming <- function(wiz, has_header) {
+  if (!isTRUE(has_header)) return(length(wiz$csv_col_names_detected) > 0)
+  raw <- wiz$raw_header_names
+  if (length(raw) == 0) return(FALSE)
+  any(!is_valid_r_name(raw)) || any(duplicated(raw))
+}
+
 list_dataset_configs <- function(config_dir) {
   if (!safe_dir_exists(config_dir)) return(character(0))
   files <- list.files(config_dir, pattern="\\.yml$", full.names=FALSE)
@@ -135,12 +195,40 @@ global_config_path <- function(config_dir) {
   file.path(config_dir, "dqcheckr.yml")
 }
 
+# TRUE if `p` is an absolute path: unix "/" or "~", a Windows drive ("C:\" /
+# "C:/"), or a UNC share ("\\server").
+is_absolute_path <- function(p) {
+  grepl("^(/|~|[A-Za-z]:[\\\\/]|\\\\\\\\)", p %||% "")
+}
+
+# Deployment root — the directory that relative infra paths (`snapshot_db`,
+# `report_output_dir`) are based on. dqcheckr's CLI resolves those relative to
+# the directory it is run from, which by convention is the deployment root that
+# contains config/, data/ and reports/; `config_dir` is `<root>/config`. The GUI
+# must NOT use getwd() for this, because shiny::runApp() changes the working
+# directory to the installed app folder — so we anchor to the parent of the
+# config directory instead. (See also the matching `wd =` on the callr runs.)
+deployment_root <- function(config_dir) {
+  dirname(config_dir %||% ".")
+}
+
+# Resolve a (possibly relative) infra path against the deployment root. Absolute
+# paths are returned unchanged, so an absolute snapshot_db/report_output_dir in
+# the config also works.
+resolve_infra_path <- function(path, config_dir, default = NULL, mustWork = FALSE) {
+  path <- path %||% default %||% ""
+  if (nchar(path) == 0) return("")
+  if (!is_absolute_path(path)) path <- file.path(deployment_root(config_dir), path)
+  normalizePath(path, mustWork = mustWork)
+}
+
 # Register (or re-register) the reports directory as the "dq_reports" static
 # resource path. Re-registering with a new path replaces the old mapping, so
 # this must be called again whenever report_output_dir changes at runtime.
-register_report_resource_path <- function(report_output_dir) {
-  report_dir <- normalizePath(report_output_dir %||% "reports/", mustWork = FALSE)
-  if (dir.exists(report_dir)) {
+register_report_resource_path <- function(report_output_dir, config_dir) {
+  report_dir <- resolve_infra_path(report_output_dir, config_dir,
+                                   default = "reports/", mustWork = FALSE)
+  if (nchar(report_dir) > 0 && dir.exists(report_dir)) {
     addResourcePath("dq_reports", report_dir)
   }
 }

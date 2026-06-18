@@ -20,7 +20,9 @@ make_wiz <- function(...) {
   base <- list(
     dataset_name = "test_ds", description = "",
     format = "csv", encoding = "UTF-8", delimiter = ",", quote_char = '"',
-    has_header = TRUE, file_mode = "folder", folder = "", current_file = "",
+    has_header = TRUE, csv_skip = 0L, col_names = character(0),
+    raw_header_names = character(0), col_name_reasons = character(0),
+    file_mode = "folder", folder = "", current_file = "",
     previous_file = "", fwf_widths = integer(0), fwf_col_names = character(0),
     fwf_skip = 0L, expected_columns = character(0), key_columns = character(0),
     col_types_override = list(), column_rules = list(), rule_overrides = list(),

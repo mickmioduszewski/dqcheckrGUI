@@ -18,7 +18,7 @@ Opens the point-and-click interface for configuring and running
 \pkg{dqcheckr} dataset quality checks.
 }
 \examples{
-\dontrun{
-run_app()
+if (interactive()) {
+  run_app()
 }
 }

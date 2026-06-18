@@ -7,9 +7,9 @@ server_history <- function(input, output, session, rv, config_dir, gcfg_rv) {
 
   # Load / reload history
   load_history <- function() {
-    db_path <- normalizePath(
-      gcfg_rv()$snapshot_db %||% "data/snapshots.sqlite",
-      mustWork = FALSE
+    db_path <- resolve_infra_path(
+      gcfg_rv()$snapshot_db, config_dir(),
+      default = "data/snapshots.sqlite", mustWork = FALSE
     )
     tryCatch({
       df <- read_all_snapshot_history(db_path, n = hist_limit())
@@ -66,9 +66,11 @@ server_history <- function(input, output, session, rv, config_dir, gcfg_rv) {
 
   # Shared drift-launch helper
   launch_drift <- function(ds_name, id1, id2) {
-    db_path    <- normalizePath(gcfg_rv()$snapshot_db %||% "data/snapshots.sqlite", mustWork = FALSE)
-    report_dir <- normalizePath(gcfg_rv()$report_output_dir %||% "reports/", mustWork = FALSE)
     cd         <- config_dir()
+    db_path    <- resolve_infra_path(gcfg_rv()$snapshot_db, cd,
+                                     default = "data/snapshots.sqlite", mustWork = FALSE)
+    report_dir <- resolve_infra_path(gcfg_rv()$report_output_dir, cd,
+                                     default = "reports/", mustWork = FALSE)
     prev_id    <- min(as.integer(c(id1, id2)))
     curr_id    <- max(as.integer(c(id1, id2)))
     showNotification("Starting drift comparison...", type = "message", duration = 4)
@@ -83,6 +85,9 @@ server_history <- function(input, output, session, rv, config_dir, gcfg_rv) {
       args    = list(dn = ds_name, p = prev_id, c = curr_id, db = db_path, cd = cd),
       stdout  = drift_log,
       stderr  = "2>&1",
+      # Run in the deployment root so dqcheckr resolves any relative paths the
+      # same way the CLI does (shiny::runApp has changed this process's getwd()).
+      wd      = deployment_root(cd),
       package = TRUE
     )
     rv_drift$log_path   <- drift_log

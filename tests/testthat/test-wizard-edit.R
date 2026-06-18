@@ -1,7 +1,6 @@
 # Integration tests: edit dataset wizard
 # Regression suite for the "step N doesn't remember settings" class of bugs.
 
-library(testthat)
 library(shinytest2)
 library(yaml)
 

@@ -404,36 +404,62 @@ server_step3_csv <- function(input, output, session, wiz) {
     }
   })
 
-  # No-header column naming panel
+  # Column-naming panel. Renders for headerless files (always) and for header
+  # files whose raw header names are invalid or duplicated (e.g. RBB RefundsPaid
+  # repeats `PayeeName`). Pre-fills suggestions with an inline reason; fully
+  # overridable. Input ids are shared across both modes (`csv_name_<i>`).
   output$step3_no_header_naming <- renderUI({
-    req(input$wiz_format == "csv", !isTRUE(as.logical(input$wiz_has_header %||% "TRUE")))
-    cols <- wiz$csv_col_names_detected
+    req(input$wiz_format == "csv")
+    has_header <- isTRUE(as.logical(input$wiz_has_header %||% "TRUE"))
+    cols <- wiz$csv_col_names_detected          # reactive trigger: the column SET
     if (is.null(cols) || length(cols) == 0) return(NULL)
+    if (!csv_needs_naming(wiz, has_header)) return(NULL)
 
-    rows <- lapply(seq_along(cols), function(i) {
-      name_id <- paste0("csv_noheader_name_", i)
-      current <- if (i <= length(wiz$col_names)) wiz$col_names[i] else paste0("col_", i)
-      fluidRow(class="mb-1",
-        column(2, span(class="text-muted", style="font-size:12px;", paste0("col_", i, " →"))),
-        column(4, textInput(name_id, NULL, value=current, placeholder=paste0("col_",i), width="100%"))
+    # Read the editable values WITHOUT subscribing to them. The collector below
+    # writes wiz$col_names on every keystroke; if this panel re-rendered on each
+    # change it would rebuild the DOM mid-edit, resetting the preview's scroll
+    # position and fighting the cursor. We only want to rebuild when the column
+    # set itself changes (handled by the reactive reads above). Per CLAUDE.md,
+    # isolate() is the wizard's standard tool for exactly this.
+    isolate({
+      reasons <- wiz$col_name_reasons
+      rows <- lapply(seq_along(cols), function(i) {
+        name_id <- paste0("csv_name_", i)
+        current <- if (i <= length(wiz$col_names)) wiz$col_names[i] else paste0("col_", i)
+        left    <- if (has_header) cols[i] else paste0("col_", i)
+        hint    <- if (length(reasons) >= i && nzchar(reasons[i]))
+          span(class="text-warning", style="font-size:11px;", paste0("⚠ ", reasons[i]))
+        else NULL
+        fluidRow(class="mb-1 align-items-center",
+          column(3, span(class="text-muted", style="font-size:12px;", paste0(left, " →"))),
+          column(4, textInput(name_id, NULL, value=current, placeholder=paste0("col_",i), width="100%")),
+          column(5, hint)
+        )
+      })
+
+      div(class="p-2 border rounded bg-light mb-3",
+        tags$strong("Column names", style="font-size:13px;"),
+        if (has_header)
+          p(class="text-muted mb-1", style="font-size:11px;",
+            "Some names in the file's header are invalid or duplicated. Adjust as needed — the original header row will be skipped when the file is read."),
+        div(style="max-height:240px;overflow-y:auto;", rows)
       )
     })
-
-    div(class="p-2 border rounded bg-light mb-3",
-      tags$strong("Column names", style="font-size:13px;"),
-      div(style="max-height:200px;overflow-y:auto;", rows)
-    )
   })
 
-  # Collect no-header names
+  # Collect names from the editor (runs under the same condition that renders it)
   observe({
-    req(input$wiz_format == "csv", !isTRUE(as.logical(input$wiz_has_header %||% "TRUE")))
+    req(input$wiz_format == "csv")
+    has_header <- isTRUE(as.logical(input$wiz_has_header %||% "TRUE"))
     cols <- wiz$csv_col_names_detected
-    req(!is.null(cols))
+    req(!is.null(cols), length(cols) > 0)
+    if (!csv_needs_naming(wiz, has_header)) return()
     names_vec <- character(length(cols))
     for (i in seq_along(cols)) {
-      v <- input[[paste0("csv_noheader_name_", i)]]
-      names_vec[i] <- if (!is.null(v) && nchar(v) > 0) v else paste0("col_", i)
+      v <- input[[paste0("csv_name_", i)]]
+      names_vec[i] <- if (!is.null(v) && nchar(v) > 0) v
+        else if (i <= length(wiz$col_names)) wiz$col_names[i]
+        else paste0("col_", i)
     }
     wiz$col_names <- names_vec
   })
@@ -505,17 +531,38 @@ trigger_csv_preview <- function(input, wiz) {
       locale=readr::locale(encoding=enc),
       show_col_types=FALSE)
     df <- as.data.frame(df)
+    ncols <- ncol(df)
 
+    # `wiz$col_names` is the single source of truth for column names. Reseed it
+    # ONLY when the column count changes — never clobber an existing list of the
+    # right length, or we would erase the user's edits / our own suggestions on
+    # every re-preview (the auto-preview observer fires on each step-3 render).
     if (!hdr) {
+      wiz$raw_header_names <- character(0)
+      wiz$col_name_reasons <- character(0)
       wiz$csv_col_names_detected <- names(df)
-      if (length(wiz$col_names) != ncol(df)) {
-        wiz$col_names <- paste0("col_", seq_len(ncol(df)))
-      }
-      names(df) <- wiz$col_names
+      if (length(wiz$col_names) != ncols)
+        wiz$col_names <- paste0("col_", seq_len(ncols))
     } else {
-      wiz$col_names <- names(df)
-      wiz$csv_col_names_detected <- names(df)
+      # Probe the *unmangled* header so duplicates survive (readr's default
+      # name_repair mangles them to `name...NN`, which we can't fix in the UI).
+      raw <- tryCatch(
+        names(readr::read_delim(path, delim=delim, n_max=0, quote=quot,
+                                name_repair="minimal",
+                                locale=readr::locale(encoding=enc),
+                                show_col_types=FALSE)),
+        error=function(e) names(df))
+      if (length(raw) != ncols) raw <- names(df)   # safety: keep counts aligned
+      sug <- suggest_col_names(raw)
+      wiz$raw_header_names <- raw
+      wiz$col_name_reasons <- sug$reason
+      wiz$csv_col_names_detected <- raw
+      if (length(wiz$col_names) != ncols)
+        wiz$col_names <- sug$names
     }
+
+    # Show the preview under the resolved names, not the raw/mangled ones.
+    if (length(wiz$col_names) == ncols) names(df) <- wiz$col_names
 
     # Infer types from sample
     wiz$col_types_inferred <- vapply(df, function(x) infer_col_type_simple(x), character(1))

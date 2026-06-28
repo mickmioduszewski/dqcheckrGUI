@@ -1,0 +1,9 @@
+pandoc: 3.8.3
+pkgdown: 2.2.0
+pkgdown_sha: ~
+articles:
+  dqcheckrGUI: dqcheckrGUI.html
+last_built: 2026-06-28T01:31Z
+urls:
+  reference: https://mickmioduszewski.github.io/dqcheckrGUI/reference
+  article: https://mickmioduszewski.github.io/dqcheckrGUI/articles

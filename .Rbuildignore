@@ -13,3 +13,6 @@
 ^doc$
 ^Meta$
 ^docs$
+^_pkgdown\.yml$
+^pkgdown$
+^mick-todo\.md$

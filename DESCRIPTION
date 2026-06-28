@@ -12,7 +12,7 @@ Description:
     running them against recurring file deliveries, and browsing historical
     check results — without writing any R code.
 License: MIT + file LICENSE
-URL: https://github.com/mickmioduszewski/dqcheckrGUI
+URL: https://mickmioduszewski.github.io/dqcheckrGUI/, https://github.com/mickmioduszewski/dqcheckrGUI
 BugReports: https://github.com/mickmioduszewski/dqcheckrGUI/issues
 Encoding: UTF-8
 Language: en-GB
@@ -39,7 +39,8 @@ Suggests:
     knitr,
     rmarkdown,
     shinytest2,
-    withr
+    withr,
+    pkgdown
 VignetteBuilder: knitr
 Config/testthat/edition: 3
 Config/roxygen2/version: 8.0.0

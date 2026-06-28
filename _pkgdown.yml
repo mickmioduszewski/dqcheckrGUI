@@ -1,0 +1,28 @@
+url: https://mickmioduszewski.github.io/dqcheckrGUI/
+
+template:
+  bootstrap: 5
+
+home:
+  title: dqcheckrGUI — Point-and-Click GUI for dqcheckr
+
+navbar:
+  structure:
+    left: [intro, articles, reference]
+    right: [search, github]
+  components:
+    github:
+      icon: fab fa-github
+      href: https://github.com/mickmioduszewski/dqcheckrGUI
+      aria-label: GitHub
+
+articles:
+  - title: Getting started
+    navbar: ~
+    contents:
+      - dqcheckrGUI
+
+reference:
+  - title: Launch
+    contents:
+      - run_app

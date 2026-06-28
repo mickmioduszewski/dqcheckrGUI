@@ -4,8 +4,8 @@
 
 * `run_app()` gains a `config_dir` argument to point the app at a specific
   project folder regardless of the R session's working directory. Passing
-  this explicitly is recommended when launching from a script on Windows or
-  from a OneDrive-synced path, where `getwd()` may not match the script
+  this explicitly is recommended when launching from a script on 'Windows' or
+  from a 'OneDrive'-synced path, where `getwd()` may not match the script
   location. The argument sets `DQCHECKR_CONFIG_DIR` for the session and
   restores the previous value on exit.
 * First-run modal: when no `dqcheckr.yml` is found, the app now shows a
@@ -17,15 +17,15 @@
   as their first entry, followed by the user home directory and system
   volumes, so the correct location is reachable without navigating from an
   unrelated working directory.
-* Pre-run check in the Run panel now surfaces malformed-YAML errors
+* Pre-run check in the Run panel now surfaces malformed-'YAML' errors
   explicitly instead of silently showing "✓ Configuration looks good" for a
   corrupt config file.
 * Custom-check file validation (wizard step 7) now distinguishes `source()`
   runtime errors (e.g. missing package, top-level `stop()`) from a missing
   `custom_checks` function, and shows the specific error message.
-* pkgdown documentation site added at
+* 'pkgdown' documentation site added at
   `https://mickmioduszewski.github.io/dqcheckrGUI/`, deployed automatically
-  via GitHub Actions on every push to `main`.
+  via 'GitHub Actions' on every push to `main`.
 
 ## Bug fixes
 
@@ -43,17 +43,17 @@
 ## Documentation
 
 * Vignette updated with `config_dir` argument usage, `DQCHECKR_CONFIG_DIR`
-  env var option, Windows/OneDrive launcher pattern, and first-run modal
+  env var option, 'Windows'/'OneDrive' launcher pattern, and first-run modal
   description.
 * `?dqcheckrGUI` package help page now resolves (dropped `@noRd`); includes
   Getting started and Related packages sections with cross-references to
-  `dqcheckr` vignettes.
+  'dqcheckr' vignettes.
 * `?run_app` gains `@seealso` links to the vignette and
   `dqcheckr::run_dq_check`.
 
 ## Testing
 
-* `skip_on_cran()` added to all `shinytest2` test blocks; the suite requires
+* `skip_on_cran()` added to all 'shinytest2' test blocks; the suite requires
   a browser and runs ~108 s, which exceeds CRAN's time limit.
 * Removed unnecessary `library()` calls from test files; all packages are
   accessed via `::` (exception: `library(shiny)` retained in
@@ -68,7 +68,7 @@
   a run panel for launching checks against incoming file deliveries and
   viewing the generated HTML report, and a history browser for past results
   and drift comparisons between snapshots.
-* CSV onboarding handles header rows with duplicate or otherwise invalid
+* 'CSV' onboarding handles header rows with duplicate or otherwise invalid
   column names (e.g. an extract that repeats `PayeeName`/`Amount`): a
   raw-header probe (`name_repair = "minimal"`) recovers the names and
   `suggest_col_names()` proposes valid, unique, editable fixes. On save a
@@ -77,6 +77,6 @@
   as data; clean files write neither key.
 * Relative `snapshot_db` / `report_output_dir` paths in the config are
   resolved against the deployment root (the parent of the config directory),
-  and background `callr` runs execute with `wd` set there, so the GUI reads
+  and background 'callr' runs execute with `wd` set there, so the GUI reads
   and writes the same snapshot database the 'dqcheckr' CLI does. Absolute
   paths continue to work unchanged.

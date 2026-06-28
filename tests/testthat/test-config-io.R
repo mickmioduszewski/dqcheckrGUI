@@ -1,8 +1,6 @@
 # Unit tests for R/config_io.R
 # These catch YAML round-trip bugs without needing a running Shiny app.
 
-library(yaml)
-
 # ── read_config: field reading ───────────────────────────────────────────────
 
 test_that("read_config reads all standard fields", {

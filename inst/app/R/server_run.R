@@ -36,8 +36,11 @@ server_run <- function(input, output, session, rv, config_dir, gcfg_rv) {
       issues <- c(issues, paste("Config file not found:", cfg_path))
 
     if (safe_file_exists(cfg_path)) {
-      cfg <- tryCatch(read_config(cfg_path)$known, error=function(e) NULL)
-      if (!is.null(cfg)) {
+      cfg_result <- tryCatch(read_config(cfg_path), error = function(e) e)
+      if (inherits(cfg_result, "error")) {
+        issues <- c(issues, paste("Config could not be parsed:", conditionMessage(cfg_result)))
+      } else {
+        cfg <- cfg_result$known
         # Resolve relative paths against deployment root before checking —
         # the Shiny process's getwd() is the package install dir, not the
         # project root, so raw relative paths would always fail here.

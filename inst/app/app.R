@@ -234,18 +234,18 @@ shinyApp(
           snapshot_db       = "data/snapshots.sqlite",
           report_output_dir = "reports/",
           default_rules     = list(
-            type_inference_threshold = 0.9,
-            max_missing_rate         = 0.05,
-            max_non_numeric_rate     = 0.1,
-            min_row_count            = 0L,
-            max_row_count_change_pct = 20,
-            max_mean_shift_pct       = 20,
-            max_missing_change_pp    = 5,
-            max_non_numeric_change_pp = 5,
-            flag_new_cols            = TRUE,
-            flag_dropped_cols        = TRUE,
-            flag_type_changes        = TRUE,
-            flag_col_order           = FALSE
+            type_inference_threshold       = 0.90,
+            max_missing_rate               = 0.05,
+            max_non_numeric_rate           = 0.01,
+            min_row_count                  = 0L,
+            max_row_count_change_pct       = 0.10,
+            max_numeric_mean_shift_pct     = 0.20,
+            max_missing_rate_change_pp     = 2.0,
+            max_non_numeric_rate_change_pp = 1.0,
+            flag_new_columns               = TRUE,
+            flag_dropped_columns           = TRUE,
+            flag_type_changes              = TRUE,
+            flag_column_order_change       = TRUE
           )
         )
         yaml::write_yaml(default_cfg, global_config_path(cd))

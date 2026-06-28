@@ -9,6 +9,7 @@ library(yaml)
 # Regression: renderUI re-rendered the whole step on every keystroke, losing focus.
 
 test_that("typing in step 1 does not cause excessive step re-renders", {
+  skip_on_cran()
   skip_if_not_installed("shinytest2")
   skip_if_not_installed("dqcheckr")
 
@@ -42,6 +43,7 @@ test_that("typing in step 1 does not cause excessive step re-renders", {
 })
 
 test_that("step 1 input value survives reactive settle", {
+  skip_on_cran()
   skip_if_not_installed("shinytest2")
   skip_if_not_installed("dqcheckr")
 
@@ -59,6 +61,7 @@ test_that("step 1 input value survives reactive settle", {
 # Regression: renderUI re-built the column table on every checkbox click, scrollTop→0.
 
 test_that("step 4 checkbox click does not reset table scroll position", {
+  skip_on_cran()
   skip_if_not_installed("shinytest2")
   skip_if_not_installed("dqcheckr")
 
@@ -103,6 +106,7 @@ test_that("step 4 checkbox click does not reset table scroll position", {
 # Regression: list_dataset_configs returned filesystem order; explicit sort() now added.
 
 test_that("dataset sidebar lists datasets alphabetically regardless of creation order", {
+  skip_on_cran()
   skip_if_not_installed("shinytest2")
   skip_if_not_installed("dqcheckr")
 
@@ -131,6 +135,7 @@ test_that("dataset sidebar lists datasets alphabetically regardless of creation 
 # ── Run panel: dataset selector sort order ────────────────────────────────────
 
 test_that("run panel dataset selector is sorted alphabetically", {
+  skip_on_cran()
   skip_if_not_installed("shinytest2")
   skip_if_not_installed("dqcheckr")
 
@@ -164,6 +169,7 @@ test_that("run panel dataset selector is sorted alphabetically", {
 # ── Step 2: path status badges ────────────────────────────────────────────────
 
 test_that("step 2 shows success badge for valid folder path", {
+  skip_on_cran()
   skip_if_not_installed("shinytest2")
   skip_if_not_installed("dqcheckr")
 
@@ -184,6 +190,7 @@ test_that("step 2 shows success badge for valid folder path", {
 })
 
 test_that("step 2 shows error badge for non-existent folder path", {
+  skip_on_cran()
   skip_if_not_installed("shinytest2")
   skip_if_not_installed("dqcheckr")
 
@@ -204,6 +211,7 @@ test_that("step 2 shows error badge for non-existent folder path", {
 })
 
 test_that("step 2 explicit mode shows success badge for valid file", {
+  skip_on_cran()
   skip_if_not_installed("shinytest2")
   skip_if_not_installed("dqcheckr")
 
@@ -228,6 +236,7 @@ test_that("step 2 explicit mode shows success badge for valid file", {
 # ── Global config: save and reload ────────────────────────────────────────────
 
 test_that("global config saves values to dqcheckr.yml", {
+  skip_on_cran()
   skip_if_not_installed("shinytest2")
   skip_if_not_installed("dqcheckr")
 
@@ -255,6 +264,7 @@ test_that("global config saves values to dqcheckr.yml", {
 # clickable before any checkboxes were selected.
 
 test_that("history Compare drift button is disabled on initial page load", {
+  skip_on_cran()
   skip_if_not_installed("shinytest2")
   skip_if_not_installed("dqcheckr")
 
@@ -274,6 +284,7 @@ test_that("history Compare drift button is disabled on initial page load", {
 # ── Dataset panel: Compare button starts disabled ─────────────────────────────
 
 test_that("dataset panel Compare drift button is disabled before checkboxes are checked", {
+  skip_on_cran()
   skip_if_not_installed("shinytest2")
   skip_if_not_installed("dqcheckr")
 

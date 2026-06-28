@@ -6,6 +6,7 @@ library(yaml)
 # ── New wizard: folder mode ───────────────────────────────────────────────────
 
 test_that("new wizard (folder mode) saves correct YAML with folder key", {
+  skip_on_cran()
   skip_if_not_installed("shinytest2")
   skip_if_not_installed("dqcheckr")
 
@@ -47,6 +48,7 @@ test_that("new wizard (folder mode) saves correct YAML with folder key", {
 # Regression: file_mode not synced from radio → current_file silently dropped.
 
 test_that("new wizard (explicit mode) saves current_file, not folder", {
+  skip_on_cran()
   skip_if_not_installed("shinytest2")
   skip_if_not_installed("dqcheckr")
 
@@ -87,6 +89,7 @@ test_that("new wizard (explicit mode) saves current_file, not folder", {
 # ── Step 1 validation ─────────────────────────────────────────────────────────
 
 test_that("step 1 Next is disabled until a valid name is entered", {
+  skip_on_cran()
   skip_if_not_installed("shinytest2")
   skip_if_not_installed("dqcheckr")
 
@@ -119,6 +122,7 @@ test_that("step 1 Next is disabled until a valid name is entered", {
 })
 
 test_that("step 1 shows duplicate-name error for existing dataset", {
+  skip_on_cran()
   skip_if_not_installed("shinytest2")
   skip_if_not_installed("dqcheckr")
 
@@ -139,6 +143,7 @@ test_that("step 1 shows duplicate-name error for existing dataset", {
 # ── Wizard cancel ─────────────────────────────────────────────────────────────
 
 test_that("cancel wizard discards changes without creating a file", {
+  skip_on_cran()
   skip_if_not_installed("shinytest2")
   skip_if_not_installed("dqcheckr")
 

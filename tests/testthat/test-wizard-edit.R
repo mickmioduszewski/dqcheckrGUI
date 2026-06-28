@@ -37,6 +37,7 @@ nav_to <- function(app, step) {
 # ── Step 1 ────────────────────────────────────────────────────────────────────
 
 test_that("edit step 1 restores name and description", {
+  skip_on_cran()
   skip_if_not_installed("shinytest2")
   skip_if_not_installed("dqcheckr")
 
@@ -53,6 +54,7 @@ test_that("edit step 1 restores name and description", {
 # ── Step 2 ────────────────────────────────────────────────────────────────────
 
 test_that("edit step 2 restores explicit file mode and current_file path", {
+  skip_on_cran()
   skip_if_not_installed("shinytest2")
   skip_if_not_installed("dqcheckr")
 
@@ -74,6 +76,7 @@ test_that("edit step 2 restores explicit file mode and current_file path", {
 })
 
 test_that("edit step 2 restores folder mode and folder path", {
+  skip_on_cran()
   skip_if_not_installed("shinytest2")
   skip_if_not_installed("dqcheckr")
 
@@ -102,6 +105,7 @@ test_that("edit step 2 restores folder mode and folder path", {
 # Regression: step 4 collector fired before UI rendered, wiping loaded values.
 
 test_that("edit step 4 restores key column checkboxes", {
+  skip_on_cran()
   skip_if_not_installed("shinytest2")
   skip_if_not_installed("dqcheckr")
 
@@ -120,6 +124,7 @@ test_that("edit step 4 restores key column checkboxes", {
 })
 
 test_that("edit step 4 restores expected column count", {
+  skip_on_cran()
   skip_if_not_installed("shinytest2")
   skip_if_not_installed("dqcheckr")
 
@@ -137,6 +142,7 @@ test_that("edit step 4 restores expected column count", {
 })
 
 test_that("edit step 4 restores type overrides", {
+  skip_on_cran()
   skip_if_not_installed("shinytest2")
   skip_if_not_installed("dqcheckr")
 
@@ -158,6 +164,7 @@ test_that("edit step 4 restores type overrides", {
 # Regression: step 5 collector fired before UI rendered, wiping loaded column_rules.
 
 test_that("edit step 5 restores min/max rules for numeric column", {
+  skip_on_cran()
   skip_if_not_installed("shinytest2")
   skip_if_not_installed("dqcheckr")
 
@@ -181,6 +188,7 @@ test_that("edit step 5 restores min/max rules for numeric column", {
 # loaded from config because step 6 inputs didn't exist yet.
 
 test_that("edit step 6 restores rule overrides from config", {
+  skip_on_cran()
   skip_if_not_installed("shinytest2")
   skip_if_not_installed("dqcheckr")
 
@@ -203,6 +211,7 @@ test_that("edit step 6 restores rule overrides from config", {
 # ── Edit → re-save round-trip ────────────────────────────────────────────────
 
 test_that("edit wizard re-saves without corrupting the YAML", {
+  skip_on_cran()
   skip_if_not_installed("shinytest2")
   skip_if_not_installed("dqcheckr")
 

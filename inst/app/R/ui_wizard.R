@@ -175,8 +175,7 @@ wizard_step8_ui <- function() {
       verbatimTextOutput("yaml_preview"),
     ),
     div(class="mt-3 d-flex gap-2",
-      actionButton("wizard_save", "Save config ✓", class="btn btn-success"),
-      span(uiOutput("step8_save_status"), style="align-self:center;")
+      actionButton("wizard_save", "Save config ✓", class="btn btn-success")
     )
   )
 }

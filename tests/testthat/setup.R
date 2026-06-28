@@ -1,8 +1,5 @@
 # Shared test setup — sourced automatically by testthat before all tests in this dir
 
-library(yaml)
-library(withr)
-
 # Source app R files so unit tests can call them directly
 .app_r_dir <- system.file("app/R", package = "dqcheckrGUI")
 for (.f in list.files(.app_r_dir, pattern = "\\.R$", full.names = TRUE)) {

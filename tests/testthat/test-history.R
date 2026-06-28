@@ -1,8 +1,6 @@
 # Unit tests for history utilities and report URL construction
 
-library(shiny)
-library(DBI)
-library(RSQLite)
+library(shiny)  # attaches `tags` to the search path — needed by status_badge()
 
 # ── Test DB helper ────────────────────────────────────────────────────────────
 

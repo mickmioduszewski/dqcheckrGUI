@@ -7,8 +7,8 @@
 - [`run_app()`](https://mickmioduszewski.github.io/dqcheckrGUI/reference/run_app.md)
   gains a `config_dir` argument to point the app at a specific project
   folder regardless of the R session’s working directory. Passing this
-  explicitly is recommended when launching from a script on Windows or
-  from a OneDrive-synced path, where
+  explicitly is recommended when launching from a script on ‘Windows’ or
+  from a ‘OneDrive’-synced path, where
   [`getwd()`](https://rdrr.io/r/base/getwd.html) may not match the
   script location. The argument sets `DQCHECKR_CONFIG_DIR` for the
   session and restores the previous value on exit.
@@ -21,7 +21,7 @@
   (`deployment_root`) as their first entry, followed by the user home
   directory and system volumes, so the correct location is reachable
   without navigating from an unrelated working directory.
-- Pre-run check in the Run panel now surfaces malformed-YAML errors
+- Pre-run check in the Run panel now surfaces malformed-‘YAML’ errors
   explicitly instead of silently showing “✓ Configuration looks good”
   for a corrupt config file.
 - Custom-check file validation (wizard step 7) now distinguishes
@@ -29,9 +29,9 @@
   (e.g. missing package, top-level
   [`stop()`](https://rdrr.io/r/base/stop.html)) from a missing
   `custom_checks` function, and shows the specific error message.
-- pkgdown documentation site added at
+- ‘pkgdown’ documentation site added at
   `https://mickmioduszewski.github.io/dqcheckrGUI/`, deployed
-  automatically via GitHub Actions on every push to `main`.
+  automatically via ‘GitHub Actions’ on every push to `main`.
 
 ### Bug fixes
 
@@ -49,19 +49,19 @@
 ### Documentation
 
 - Vignette updated with `config_dir` argument usage,
-  `DQCHECKR_CONFIG_DIR` env var option, Windows/OneDrive launcher
+  `DQCHECKR_CONFIG_DIR` env var option, ‘Windows’/‘OneDrive’ launcher
   pattern, and first-run modal description.
 - [`?dqcheckrGUI`](https://mickmioduszewski.github.io/dqcheckrGUI/reference/dqcheckrGUI-package.md)
   package help page now resolves (dropped `@noRd`); includes Getting
   started and Related packages sections with cross-references to
-  `dqcheckr` vignettes.
+  ‘dqcheckr’ vignettes.
 - [`?run_app`](https://mickmioduszewski.github.io/dqcheckrGUI/reference/run_app.md)
   gains `@seealso` links to the vignette and
   [`dqcheckr::run_dq_check`](https://rdrr.io/pkg/dqcheckr/man/run_dq_check.html).
 
 ### Testing
 
-- `skip_on_cran()` added to all `shinytest2` test blocks; the suite
+- `skip_on_cran()` added to all ‘shinytest2’ test blocks; the suite
   requires a browser and runs ~108 s, which exceeds CRAN’s time limit.
 - Removed unnecessary [`library()`](https://rdrr.io/r/base/library.html)
   calls from test files; all packages are accessed via `::` (exception:
@@ -81,15 +81,16 @@ CRAN release: 2026-06-24
   review/save), a run panel for launching checks against incoming file
   deliveries and viewing the generated HTML report, and a history
   browser for past results and drift comparisons between snapshots.
-- CSV onboarding handles header rows with duplicate or otherwise invalid
-  column names (e.g. an extract that repeats `PayeeName`/`Amount`): a
-  raw-header probe (`name_repair = "minimal"`) recovers the names and
-  `suggest_col_names()` proposes valid, unique, editable fixes. On save
-  a renamed header is written as `col_names` plus `csv_skip: 1`, so
-  ‘dqcheckr’ (\>= 0.2.2) skips the original header row instead of
-  reading it as data; clean files write neither key.
+- ‘CSV’ onboarding handles header rows with duplicate or otherwise
+  invalid column names (e.g. an extract that repeats
+  `PayeeName`/`Amount`): a raw-header probe (`name_repair = "minimal"`)
+  recovers the names and `suggest_col_names()` proposes valid, unique,
+  editable fixes. On save a renamed header is written as `col_names`
+  plus `csv_skip: 1`, so ‘dqcheckr’ (\>= 0.2.2) skips the original
+  header row instead of reading it as data; clean files write neither
+  key.
 - Relative `snapshot_db` / `report_output_dir` paths in the config are
   resolved against the deployment root (the parent of the config
-  directory), and background `callr` runs execute with `wd` set there,
+  directory), and background ‘callr’ runs execute with `wd` set there,
   so the GUI reads and writes the same snapshot database the ‘dqcheckr’
   CLI does. Absolute paths continue to work unchanged.

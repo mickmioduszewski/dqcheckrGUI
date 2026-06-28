@@ -37,12 +37,12 @@
 <div class="section level3">
 <h3 id="new-features-0-2-0">New features<a class="anchor" aria-label="anchor" href="#new-features-0-2-0"></a></h3>
 <ul><li>
-<code><a href="../reference/run_app.html">run_app()</a></code> gains a <code>config_dir</code> argument to point the app at a specific project folder regardless of the R session’s working directory. Passing this explicitly is recommended when launching from a script on Windows or from a OneDrive-synced path, where <code><a href="https://rdrr.io/r/base/getwd.html" class="external-link">getwd()</a></code> may not match the script location. The argument sets <code>DQCHECKR_CONFIG_DIR</code> for the session and restores the previous value on exit.</li>
+<code><a href="../reference/run_app.html">run_app()</a></code> gains a <code>config_dir</code> argument to point the app at a specific project folder regardless of the R session’s working directory. Passing this explicitly is recommended when launching from a script on ‘Windows’ or from a ‘OneDrive’-synced path, where <code><a href="https://rdrr.io/r/base/getwd.html" class="external-link">getwd()</a></code> may not match the script location. The argument sets <code>DQCHECKR_CONFIG_DIR</code> for the session and restores the previous value on exit.</li>
 <li>First-run modal: when no <code>dqcheckr.yml</code> is found, the app now shows a dialog offering to scaffold <code>config/</code>, <code>data/</code>, and <code>reports/</code> and write a default global config. Accepting opens Global Config for review before any dataset is added. Declining allows manual setup. This replaces the previous silent redirect to Global Config.</li>
 <li>File and folder pickers now root at the project folder (<code>deployment_root</code>) as their first entry, followed by the user home directory and system volumes, so the correct location is reachable without navigating from an unrelated working directory.</li>
-<li>Pre-run check in the Run panel now surfaces malformed-YAML errors explicitly instead of silently showing “✓ Configuration looks good” for a corrupt config file.</li>
+<li>Pre-run check in the Run panel now surfaces malformed-‘YAML’ errors explicitly instead of silently showing “✓ Configuration looks good” for a corrupt config file.</li>
 <li>Custom-check file validation (wizard step 7) now distinguishes <code><a href="https://rdrr.io/r/base/source.html" class="external-link">source()</a></code> runtime errors (e.g. missing package, top-level <code><a href="https://rdrr.io/r/base/stop.html" class="external-link">stop()</a></code>) from a missing <code>custom_checks</code> function, and shows the specific error message.</li>
-<li>pkgdown documentation site added at <code>https://mickmioduszewski.github.io/dqcheckrGUI/</code>, deployed automatically via GitHub Actions on every push to <code>main</code>.</li>
+<li>‘pkgdown’ documentation site added at <code>https://mickmioduszewski.github.io/dqcheckrGUI/</code>, deployed automatically via ‘GitHub Actions’ on every push to <code>main</code>.</li>
 </ul></div>
 <div class="section level3">
 <h3 id="bug-fixes-0-2-0">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-0-2-0"></a></h3>
@@ -52,16 +52,16 @@
 </ul></div>
 <div class="section level3">
 <h3 id="documentation-0-2-0">Documentation<a class="anchor" aria-label="anchor" href="#documentation-0-2-0"></a></h3>
-<ul><li>Vignette updated with <code>config_dir</code> argument usage, <code>DQCHECKR_CONFIG_DIR</code> env var option, Windows/OneDrive launcher pattern, and first-run modal description.</li>
+<ul><li>Vignette updated with <code>config_dir</code> argument usage, <code>DQCHECKR_CONFIG_DIR</code> env var option, ‘Windows’/‘OneDrive’ launcher pattern, and first-run modal description.</li>
 <li>
-<code><a href="../reference/dqcheckrGUI-package.html">?dqcheckrGUI</a></code> package help page now resolves (dropped <code>@noRd</code>); includes Getting started and Related packages sections with cross-references to <code>dqcheckr</code> vignettes.</li>
+<code><a href="../reference/dqcheckrGUI-package.html">?dqcheckrGUI</a></code> package help page now resolves (dropped <code>@noRd</code>); includes Getting started and Related packages sections with cross-references to ‘dqcheckr’ vignettes.</li>
 <li>
 <code><a href="../reference/run_app.html">?run_app</a></code> gains <code>@seealso</code> links to the vignette and <code><a href="https://rdrr.io/pkg/dqcheckr/man/run_dq_check.html" class="external-link">dqcheckr::run_dq_check</a></code>.</li>
 </ul></div>
 <div class="section level3">
 <h3 id="testing-0-2-0">Testing<a class="anchor" aria-label="anchor" href="#testing-0-2-0"></a></h3>
 <ul><li>
-<code>skip_on_cran()</code> added to all <code>shinytest2</code> test blocks; the suite requires a browser and runs ~108 s, which exceeds CRAN’s time limit.</li>
+<code>skip_on_cran()</code> added to all ‘shinytest2’ test blocks; the suite requires a browser and runs ~108 s, which exceeds CRAN’s time limit.</li>
 <li>Removed unnecessary <code><a href="https://rdrr.io/r/base/library.html" class="external-link">library()</a></code> calls from test files; all packages are accessed via <code>::</code> (exception: <code><a href="https://shiny.posit.co/" class="external-link">library(shiny)</a></code> retained in <code>test-history.R</code> to attach <code>tags</code> to the search path for <code>status_badge()</code>).</li>
 </ul></div>
 </div>
@@ -69,8 +69,8 @@
 <h2 class="pkg-version" data-toc-text="0.1.0" id="dqcheckrgui-010">dqcheckrGUI 0.1.0<a class="anchor" aria-label="anchor" href="#dqcheckrgui-010"></a></h2><p class="text-muted">CRAN release: 2026-06-24</p>
 <ul><li>Initial release: a point-and-click ‘shiny’ front-end for ‘dqcheckr’ that drives automated dataset quality checks without writing any R code.</li>
 <li>Configuration wizard for setting up checks on a new dataset (identity, files, structure, columns, rules, overrides, custom checks, review/save), a run panel for launching checks against incoming file deliveries and viewing the generated HTML report, and a history browser for past results and drift comparisons between snapshots.</li>
-<li>CSV onboarding handles header rows with duplicate or otherwise invalid column names (e.g. an extract that repeats <code>PayeeName</code>/<code>Amount</code>): a raw-header probe (<code>name_repair = "minimal"</code>) recovers the names and <code>suggest_col_names()</code> proposes valid, unique, editable fixes. On save a renamed header is written as <code>col_names</code> plus <code>csv_skip: 1</code>, so ‘dqcheckr’ (&gt;= 0.2.2) skips the original header row instead of reading it as data; clean files write neither key.</li>
-<li>Relative <code>snapshot_db</code> / <code>report_output_dir</code> paths in the config are resolved against the deployment root (the parent of the config directory), and background <code>callr</code> runs execute with <code>wd</code> set there, so the GUI reads and writes the same snapshot database the ‘dqcheckr’ CLI does. Absolute paths continue to work unchanged.</li>
+<li>‘CSV’ onboarding handles header rows with duplicate or otherwise invalid column names (e.g. an extract that repeats <code>PayeeName</code>/<code>Amount</code>): a raw-header probe (<code>name_repair = "minimal"</code>) recovers the names and <code>suggest_col_names()</code> proposes valid, unique, editable fixes. On save a renamed header is written as <code>col_names</code> plus <code>csv_skip: 1</code>, so ‘dqcheckr’ (&gt;= 0.2.2) skips the original header row instead of reading it as data; clean files write neither key.</li>
+<li>Relative <code>snapshot_db</code> / <code>report_output_dir</code> paths in the config are resolved against the deployment root (the parent of the config directory), and background ‘callr’ runs execute with <code>wd</code> set there, so the GUI reads and writes the same snapshot database the ‘dqcheckr’ CLI does. Absolute paths continue to work unchanged.</li>
 </ul></div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside></div>

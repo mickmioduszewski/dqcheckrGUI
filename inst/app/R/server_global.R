@@ -2,11 +2,12 @@
 
 server_global <- function(input, output, session, rv, config_dir, gcfg_rv) {
 
-  roots <- reactive({
-    c(Project = deployment_root(config_dir()),
-      Home    = path.expand("~"),
-      shinyFiles::getVolumes()())
-  })
+  # shinyFiles 0.9.3 bug: roots must be a plain named vector (see server_wizard.R).
+  roots <- c(
+    Project = deployment_root(isolate(config_dir())),
+    Home    = path.expand("~"),
+    shinyFiles::getVolumes()()
+  )
 
   shinyFiles::shinyFileChoose(input, "gcfg_db_browse",
     roots=roots, session=session)
@@ -15,13 +16,13 @@ server_global <- function(input, output, session, rv, config_dir, gcfg_rv) {
 
   observeEvent(input$gcfg_db_browse, {
     req(is.list(input$gcfg_db_browse))
-    p <- shinyFiles::parseFilePaths(roots(), input$gcfg_db_browse)
+    p <- shinyFiles::parseFilePaths(roots, input$gcfg_db_browse)
     if (nrow(p) > 0) updateTextInput(session, "gcfg_snapshot_db", value=as.character(p$datapath[1]))
   })
 
   observeEvent(input$gcfg_dir_browse, {
     req(is.list(input$gcfg_dir_browse))
-    p <- shinyFiles::parseDirPath(roots(), input$gcfg_dir_browse)
+    p <- shinyFiles::parseDirPath(roots, input$gcfg_dir_browse)
     if (length(p) > 0) updateTextInput(session, "gcfg_report_dir", value=as.character(p[1]))
   })
 

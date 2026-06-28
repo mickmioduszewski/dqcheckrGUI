@@ -32,7 +32,7 @@ Days since last update: 4
 
 Informational only. This is a major version bump (0.1.0 → 0.2.0) with new
 user-facing features (`config_dir` argument, first-run modal, file picker
-improvements) and bug fixes documented in NEWS.md.
+improvements) and bug fixes documented in NEWS.md. The bugs on 'Windows' were self-detected and substantial enough to warrant an urgent fix.
 
 ## Package notes
 

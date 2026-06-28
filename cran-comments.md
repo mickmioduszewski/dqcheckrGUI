@@ -2,33 +2,19 @@
 
 ## R CMD check results
 
-0 errors | 0 warnings | 2 notes
+0 errors | 0 warnings | 1 note
 
 ## Test environments
 
 * macOS Tahoe 26.5 / aarch64-apple-darwin23, R 4.6.0, checked via
   `rcmdcheck::rcmdcheck(<built tarball>, args = "--as-cran")` (local):
-  0 errors | 0 warnings | 2 notes
-* win-builder: R-devel — results pending (submitted 2026-06-28)
+  0 errors | 0 warnings | 1 note
+* win-builder: R-devel (2026-06-25 r90191 ucrt):
+  0 errors | 0 warnings | 1 note
 
 ## Notes
 
-### NOTE 1: Possibly invalid URL
-
-```
-Found the following (possibly) invalid URLs:
-  URL: https://mickmioduszewski.github.io/dqcheckrGUI/
-    From: DESCRIPTION
-    Status: 404
-    Message: Not Found
-```
-
-The 'pkgdown' documentation site is deployed via 'GitHub Actions' and will
-be live at that URL once 'GitHub Pages' is enabled in the repository
-settings. The workflow was pushed on 2026-06-28 alongside this version. The
-URL is valid; the 404 is a transient state during the deployment window.
-
-### NOTE 2: Skipping HTML validation
+### NOTE 1: Skipping HTML validation (local only)
 
 ```
 Skipping checking HTML validation: 'tidy' doesn't look like recent enough HTML Tidy.
@@ -36,6 +22,17 @@ Skipping checking HTML validation: 'tidy' doesn't look like recent enough HTML T
 
 Caused by an outdated `tidy` binary on the local check machine. Does not
 appear on CRAN's check servers, which run a current version of 'HTML Tidy'.
+
+### NOTE 2: Days since last update (win-builder only)
+
+```
+Maintainer: 'Mick Mioduszewski <mick@mioduszewski.net>'
+Days since last update: 4
+```
+
+Informational only. This is a major version bump (0.1.0 → 0.2.0) with new
+user-facing features (`config_dir` argument, first-run modal, file picker
+improvements) and bug fixes documented in NEWS.md.
 
 ## Package notes
 

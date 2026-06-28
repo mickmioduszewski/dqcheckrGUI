@@ -1,8 +1,8 @@
 Package: dqcheckrGUI
 Type: Package
 Title: Point-and-Click GUI Client for 'dqcheckr'
-Version: 0.1.0
-Date: 2026-06-18
+Version: 0.2.0
+Date: 2026-06-28
 Authors@R: person("Mick", "Mioduszewski",
                   email = "mick@mioduszewski.net",
                   role  = c("aut", "cre"))

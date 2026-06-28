@@ -188,7 +188,14 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
   iv_step1$enable()
 
   # ── Step 2: File location ────────────────────────────────────────────
-  file_roots <- c(Home=path.expand("~"), WD=getwd())
+  # Roots for file/folder pickers: project root first (most useful), then
+  # home, then system volumes (gives drive letters on Windows).
+  # Must be reactive because config_dir() is reactive.
+  file_roots <- reactive({
+    c(Project = deployment_root(config_dir()),
+      Home    = path.expand("~"),
+      shinyFiles::getVolumes()())
+  })
 
   shinyFiles::shinyDirChoose(input, "wiz_folder_browse",
     roots=file_roots, session=session)
@@ -202,7 +209,7 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
   # Direct text input is the primary path entry (see observers below).
   observeEvent(input$wiz_folder_browse, {
     req(is.list(input$wiz_folder_browse))
-    p <- shinyFiles::parseDirPath(file_roots, input$wiz_folder_browse)
+    p <- shinyFiles::parseDirPath(file_roots(), input$wiz_folder_browse)
     if (length(p) > 0) {
       path <- as.character(p[1])
       updateTextInput(session, "wiz_folder_display", value=path)
@@ -212,7 +219,7 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
 
   observeEvent(input$wiz_current_file_browse, {
     req(is.list(input$wiz_current_file_browse))
-    p <- shinyFiles::parseFilePaths(file_roots, input$wiz_current_file_browse)
+    p <- shinyFiles::parseFilePaths(file_roots(), input$wiz_current_file_browse)
     if (nrow(p) > 0) {
       path <- as.character(p$datapath[1])
       updateTextInput(session, "wiz_current_file_display", value=path)
@@ -222,7 +229,7 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
 
   observeEvent(input$wiz_prev_file_browse, {
     req(is.list(input$wiz_prev_file_browse))
-    p <- shinyFiles::parseFilePaths(file_roots, input$wiz_prev_file_browse)
+    p <- shinyFiles::parseFilePaths(file_roots(), input$wiz_prev_file_browse)
     if (nrow(p) > 0) {
       path <- as.character(p$datapath[1])
       updateTextInput(session, "wiz_prev_file_display", value=path)
@@ -627,7 +634,7 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
 
   observeEvent(input$wiz_custom_browse, {
     req(is.list(input$wiz_custom_browse))
-    p <- shinyFiles::parseFilePaths(file_roots, input$wiz_custom_browse)
+    p <- shinyFiles::parseFilePaths(file_roots(), input$wiz_custom_browse)
     if (nrow(p) > 0) {
       updateTextInput(session, "wiz_custom_file", value=as.character(p$datapath[1]))
       wiz$custom_checks_file <- as.character(p$datapath[1])

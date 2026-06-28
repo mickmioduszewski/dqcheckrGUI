@@ -38,10 +38,14 @@ server_run <- function(input, output, session, rv, config_dir, gcfg_rv) {
     if (safe_file_exists(cfg_path)) {
       cfg <- tryCatch(read_config(cfg_path)$known, error=function(e) NULL)
       if (!is.null(cfg)) {
-        # Check file/folder exists
-        if (nchar(cfg$folder %||% "") > 0 && !safe_dir_exists(cfg$folder))
+        # Resolve relative paths against deployment root before checking —
+        # the Shiny process's getwd() is the package install dir, not the
+        # project root, so raw relative paths would always fail here.
+        if (nchar(cfg$folder %||% "") > 0 &&
+            !safe_dir_exists(resolve_infra_path(cfg$folder, cd)))
           issues <- c(issues, paste("Folder not found:", cfg$folder))
-        if (nchar(cfg$current_file %||% "") > 0 && !safe_file_exists(cfg$current_file))
+        if (nchar(cfg$current_file %||% "") > 0 &&
+            !safe_file_exists(resolve_infra_path(cfg$current_file, cd)))
           issues <- c(issues, paste("Current file not found:", cfg$current_file))
       }
     }

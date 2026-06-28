@@ -34,25 +34,75 @@ devtools::install_github("mickmioduszewski/dqcheckrGUI")
 dqcheckrGUI::run_app()
 ```
 
-The app opens in your default browser at `http://localhost:4321`. It reads and
-writes files relative to the working directory you launched from, so set that
-to your project folder before calling `run_app()`. The terminal window must
-remain open while the app is running — closing it stops the app.
+The app opens in your default browser. The terminal window must remain open
+while the app is running — closing it stops the app.
 
-Alternatively, double-click `launch.command` (macOS), `launch.sh` (Linux), or
-`launch.bat` (Windows) from the app directory.
+### Pointing the app at your project
+
+The app needs to know which folder holds your `config/`, `data/`, and
+`reports/` directories. There are two ways to set this:
+
+**Option A — `config_dir` argument (recommended)**
+
+Pass the path to your project's `config/` folder when launching. This works
+regardless of the R session's working directory, which is important on
+Windows where the session directory may not match the script's location.
+
+```{r}
+# From a launcher script in the project folder:
+dqcheckrGUI::run_app(
+  config_dir = file.path(dirname(rstudioapi::getSourceEditorContext()$path), "config")
+)
+```
+
+**Option B — environment variable**
+
+Set `DQCHECKR_CONFIG_DIR` before launching. Useful for shared or
+server-based deployments.
+
+```{r}
+Sys.setenv(DQCHECKR_CONFIG_DIR = "/path/to/project/config")
+dqcheckrGUI::run_app()
+```
+
+If neither is set, the app falls back to a `config/` subdirectory of the R
+session's working directory — which may not be your project folder.
+
+### Windows and OneDrive
+
+On Windows, files are commonly stored in a OneDrive-synced folder with a long
+path such as:
+
+```
+C:/Users/username/OneDrive - Organisation/Documents/My Project/
+```
+
+Because the R session's working directory may differ from the script's
+location, always use the `config_dir` argument in your launcher script:
+
+```{r}
+# run_dq.r — place this file in the project root
+library(dqcheckrGUI)
+setwd(dirname(rstudioapi::getSourceEditorContext()$path))
+run_app(config_dir = file.path(getwd(), "config"))
+```
+
+This ensures the app resolves `data/`, `reports/`, and all relative dataset
+paths correctly regardless of the OneDrive path or the Windows username.
 
 ### First-run setup
 
-On first launch, if no `dqcheckr.yml` global config file exists in the working
-directory, the app opens directly to **Global Config** and prompts you to set
-two paths before doing anything else:
+On first launch in an empty folder, the app shows a **New project** dialog:
 
-- **Snapshot database** — where run summaries are stored (e.g. `data/snapshots.sqlite`)
-- **Report output directory** — where HTML reports are written (e.g. `reports/`)
+> *No configuration found. Create the standard project layout (config/, data/,
+> reports/) here?*
 
-Click **Save global config** once these are set, then proceed to configure
-your first dataset.
+Click **Yes, create project** to scaffold the directories and write a default
+`dqcheckr.yml`. The app then opens **Global Config** where you can review and
+adjust the default paths and thresholds before adding datasets.
+
+If you prefer to set up manually, click **No, I'll set it up manually** and
+create the directories yourself before saving the global config.
 
 ### Example configuration files
 
@@ -381,7 +431,15 @@ machine. SQLite handles concurrent reads safely; two simultaneous writes
 
 ## Learn more
 
-See `vignette("dqcheckr", package = "dqcheckr")` for a full description of
-every quality check (QC-01 to QC-14, SC-01/02, CP-01 to CP-08), per-column
-configuration options, custom checks, snapshot database schema, and the
-`compare_snapshots()` function used for drift reports.
+The `dqcheckr` package provides two vignettes:
+
+```{r}
+# Core concepts, config keys, custom checks, and the run_dq_check() API:
+if (requireNamespace("dqcheckr", quietly = TRUE))
+  vignette("dqcheckr", package = "dqcheckr")
+
+# Full software specification — every check (QC-01 to QC-14, SC-01/02,
+# CP-01 to CP-08), snapshot schema, compare_snapshots(), and drift reports:
+if (requireNamespace("dqcheckr", quietly = TRUE))
+  vignette("specification", package = "dqcheckr")
+```

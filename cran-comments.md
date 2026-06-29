@@ -2,15 +2,17 @@
 
 ## R CMD check results
 
-0 errors | 0 warnings | 1 note
+0 errors | 0 warnings | 2 notes
 
 ## Test environments
 
-* macOS Tahoe 26.5 / aarch64-apple-darwin23, R 4.6.0, checked via
-  `rcmdcheck::rcmdcheck(<built tarball>, args = "--as-cran")` (local):
-  0 errors | 0 warnings | 1 note
+* macOS Tahoe 26.5.1 / aarch64-apple-darwin23, R 4.6.0 (2026-04-24), checked via
+  `rcmdcheck::rcmdcheck(<pkg dir>, args = "--as-cran")` (local):
+  0 errors | 0 warnings | 2 notes
 * win-builder: R-devel (2026-06-25 r90191 ucrt):
   0 errors | 0 warnings | 1 note
+* win-builder: R-devel (2026-06-29, pending):
+  results awaited
 
 ## Notes
 
@@ -23,11 +25,11 @@ Skipping checking HTML validation: 'tidy' doesn't look like recent enough HTML T
 Caused by an outdated `tidy` binary on the local check machine. Does not
 appear on CRAN's check servers, which run a current version of 'HTML Tidy'.
 
-### NOTE 2: Days since last update (win-builder only)
+### NOTE 2: Days since last update (local and win-builder)
 
 ```
 Maintainer: 'Mick Mioduszewski <mick@mioduszewski.net>'
-Days since last update: 4
+Days since last update: 5
 ```
 
 Informational only. This is a major version bump (0.1.0 → 0.2.0) with new

@@ -39,6 +39,7 @@
 #' @importFrom shinyvalidate InputValidator
 #' @importFrom stats median
 #' @importFrom tools file_path_sans_ext
+#' @importFrom utils URLencode
 #' @importFrom yaml read_yaml
 #'
 #' @keywords internal

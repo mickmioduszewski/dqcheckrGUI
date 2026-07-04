@@ -40,6 +40,7 @@ as used -- without a reference here, \code{R CMD check} reports
 \seealso{
 Useful links:
 \itemize{
+  \item \url{https://mickmioduszewski.github.io/dqcheckrGUI/}
   \item \url{https://github.com/mickmioduszewski/dqcheckrGUI}
   \item Report bugs at \url{https://github.com/mickmioduszewski/dqcheckrGUI/issues}
 }

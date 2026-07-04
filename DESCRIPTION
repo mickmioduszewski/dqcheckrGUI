@@ -33,6 +33,7 @@ Imports:
     DBI,
     RSQLite,
     stats,
+    utils,
     tools
 Suggests:
     testthat (>= 3.1.0),

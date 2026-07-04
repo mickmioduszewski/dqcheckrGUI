@@ -71,10 +71,6 @@ read_global_config <- function(path) {
   yaml::read_yaml(path)
 }
 
-write_global_config <- function(values, path) {
-  yaml::write_yaml(values, path)
-}
-
 # Merge edited values over the existing on-disk global config so hand-added
 # keys survive a GUI save — parity with the dataset-config round-trip (spec
 # §20). Two levels: unknown top-level keys are preserved, and inside

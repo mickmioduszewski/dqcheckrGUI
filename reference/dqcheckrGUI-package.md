@@ -36,6 +36,8 @@ from".
 
 Useful links:
 
+- <https://mickmioduszewski.github.io/dqcheckrGUI/>
+
 - <https://github.com/mickmioduszewski/dqcheckrGUI>
 
 - Report bugs at

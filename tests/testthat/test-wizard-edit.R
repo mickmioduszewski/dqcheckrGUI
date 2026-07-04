@@ -116,9 +116,11 @@ test_that("edit step 4 restores key column checkboxes", {
   open_edit(app, "rich_test_ds")
   nav_to(app, 4)
 
-  # 'id' is column 1; it should be the key column
+  # 'id' is column 1; it should be the key column. IDs are s4_key_<seq>_<i>
+  # (nonce per wizard open — G-03), so match on prefix and _1 suffix.
   key1_checked <- app$get_js(
-    "document.getElementById('s4_key_1')?.checked"
+    "Array.from(document.querySelectorAll('input[id^=\"s4_key_\"]'))
+       .find(c => c.id.endsWith('_1'))?.checked"
   )
   expect_true(isTRUE(key1_checked), info = "'id' (col 1) must be checked as key column")
 })
@@ -232,4 +234,93 @@ test_that("edit wizard re-saves without corrupting the YAML", {
   expect_equal(unlist(saved$key_columns), "id")
   expect_equal(saved$rule_overrides$max_missing_rate, 0.10, tolerance = 1e-6)
   expect_equal(as.integer(saved$rule_overrides$min_row_count), 5L)
+})
+
+# ── Cross-open state isolation (0.2.1, G-03) ──────────────────────────────────
+# Editing dataset A then dataset B must not leak A's step-4 selections into B —
+# previously stale positional inputs from A's session could clobber B's state.
+
+test_that("editing a second dataset does not inherit the first one's key columns", {
+  skip_on_cran()
+  skip_if_not_installed("shinytest2")
+  skip_if_not_installed("dqcheckr")
+
+  cfg_dir <- make_test_config_dir()
+  yaml::write_yaml(make_rich_config(fixture_csv), file.path(cfg_dir, "rich_test_ds.yml"))
+  yaml::write_yaml(
+    list(dataset_name = "plain_ds", format = "csv", encoding = "UTF-8",
+         delimiter = ",", current_file = fixture_csv),   # no key/expected cols
+    file.path(cfg_dir, "plain_ds.yml")
+  )
+  app <- make_app_driver(cfg_dir)
+
+  # Open A (has key column 'id'), render its step 4, then cancel out.
+  open_edit(app, "rich_test_ds")
+  nav_to(app, 4)
+  app$click("wizard_cancel");         app$wait_for_idle(timeout = 5000)
+  app$click("wizard_cancel_confirm"); app$wait_for_idle(timeout = 5000)
+
+  # Open B and render its step 4: no key checkbox may be checked.
+  open_edit(app, "plain_ds")
+  nav_to(app, 4)
+  n_checked <- app$get_js(
+    "Array.from(document.querySelectorAll('input[id^=\"s4_key_\"]'))
+       .filter(c => c.offsetParent !== null && c.checked).length"
+  )
+  expect_equal(as.integer(n_checked), 0L)
+
+  # And B's YAML preview must not contain A's key_columns.
+  wizard_go_to_step(app, 8, from_step = 4)
+  yaml_text <- app$get_value(output = "yaml_preview")
+  expect_false(grepl("key_columns", yaml_text, fixed = TRUE))
+  expect_match(yaml_text, "dataset_name: plain_ds")
+})
+
+# ── Rename flow (0.2.1, G-07) ─────────────────────────────────────────────────
+
+test_that("renaming a dataset in edit mode removes the old config file", {
+  skip_on_cran()
+  skip_if_not_installed("shinytest2")
+  skip_if_not_installed("dqcheckr")
+
+  cfg_dir <- make_test_config_dir()
+  yaml::write_yaml(make_rich_config(fixture_csv), file.path(cfg_dir, "rich_test_ds.yml"))
+  app <- make_app_driver(cfg_dir)
+
+  open_edit(app, "rich_test_ds")
+  app$set_inputs(wiz_dataset_name = "renamed_ds")
+  app$wait_for_idle(timeout = 5000)
+  nav_to(app, 8)
+  app$click("wizard_save")
+  app$wait_for_idle(timeout = 8000)
+
+  expect_true(file.exists(file.path(cfg_dir, "renamed_ds.yml")))
+  expect_false(file.exists(file.path(cfg_dir, "rich_test_ds.yml")))
+})
+
+test_that("renaming onto another existing dataset is blocked at save", {
+  skip_on_cran()
+  skip_if_not_installed("shinytest2")
+  skip_if_not_installed("dqcheckr")
+
+  cfg_dir <- make_test_config_dir()
+  yaml::write_yaml(make_rich_config(fixture_csv), file.path(cfg_dir, "rich_test_ds.yml"))
+  yaml::write_yaml(
+    list(dataset_name = "victim_ds", format = "csv", encoding = "UTF-8",
+         delimiter = ",", current_file = fixture_csv, description = "keep me"),
+    file.path(cfg_dir, "victim_ds.yml")
+  )
+  app <- make_app_driver(cfg_dir)
+
+  open_edit(app, "rich_test_ds")
+  app$set_inputs(wiz_dataset_name = "victim_ds")
+  app$wait_for_idle(timeout = 5000)
+  nav_to(app, 8)
+  app$click("wizard_save")
+  app$wait_for_idle(timeout = 8000)
+
+  # victim_ds.yml untouched; rich_test_ds.yml still present (save was blocked)
+  victim <- yaml::read_yaml(file.path(cfg_dir, "victim_ds.yml"))
+  expect_equal(victim$description, "keep me")
+  expect_true(file.exists(file.path(cfg_dir, "rich_test_ds.yml")))
 })

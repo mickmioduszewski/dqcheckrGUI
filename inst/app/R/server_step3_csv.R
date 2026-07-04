@@ -1,6 +1,6 @@
 # Step 3 CSV branch server logic (spec §11.3–11.4)
 
-sniff_csv_file <- function(path) {
+sniff_csv_file <- function(path, threshold = 0.90) {
   tryCatch({
     lines <- readLines(path, n = 100, warn = FALSE)
     lines <- lines[nchar(trimws(lines)) > 0]
@@ -29,7 +29,8 @@ sniff_csv_file <- function(path) {
     list(delimiter  = best_delim,
          has_header = has_header,
          col_names  = names(df),
-         col_types  = vapply(df, infer_col_type_simple, character(1)))
+         col_types  = vapply(df, infer_col_type_simple, character(1),
+                             threshold = threshold))
   }, error = function(e) NULL)
 }
 
@@ -41,14 +42,15 @@ load_raw_preview <- function(session, path, wiz) {
   wiz$raw_lines <- lines
   shinyAce::updateAceEditor(session, "raw_preview",
     value=paste(lines, collapse="\n"))
-  # Update ruler
-  max_chars <- max(nchar(lines), na.rm=TRUE)
+  # Update ruler (guard: max(numeric(0)) is -Inf with a warning on empty files)
+  lines_ok  <- lines[!is.na(lines)]
+  max_chars <- if (length(lines_ok) > 0) max(nchar(lines_ok)) else 40L
   max_chars <- min(max(max_chars, 40), 200)
   ruler_str <- make_ruler_string(max_chars)
   wiz$ruler_string <- ruler_str
 }
 
-server_step3_csv <- function(input, output, session, wiz) {
+server_step3_csv <- function(input, output, session, wiz, gcfg_rv) {
 
   # CSV fields shown/hidden
   output$step3_csv_fields <- renderUI({
@@ -135,7 +137,7 @@ server_step3_csv <- function(input, output, session, wiz) {
     path <- wiz$current_preview_path
     req(nchar(path %||% "") > 0)
 
-    sniff <- sniff_csv_file(path)
+    sniff <- sniff_csv_file(path, wiz_type_threshold(wiz, gcfg_rv()))
 
     if (!is.null(sniff) && !is.null(sniff$col_names)) {
       wiz$sniff_col_names <- sniff$col_names
@@ -293,12 +295,12 @@ server_step3_csv <- function(input, output, session, wiz) {
 
   # Preview trigger (CSV)
   observeEvent(input$step3_preview_btn, {
-    trigger_csv_preview(input, wiz)
+    trigger_csv_preview(input, wiz, wiz_type_threshold(wiz, gcfg_rv()))
   })
   # Also auto-preview when format is CSV and file is loaded
   observe({
     req(input$wiz_format == "csv", length(wiz$raw_lines) > 0)
-    trigger_csv_preview(input, wiz)
+    trigger_csv_preview(input, wiz, wiz_type_threshold(wiz, gcfg_rv()))
   })
 
   # FWF boundary positions → widths
@@ -336,11 +338,12 @@ server_step3_csv <- function(input, output, session, wiz) {
     n <- length(wiz$fwf_widths)
     if (n == 0) return(p(class="text-muted fst-italic", "No column boundaries set yet. Click on the text preview above."))
 
+    seq_no <- isolate(wiz$open_seq)
     starts <- c(1L, cumsum(wiz$fwf_widths[-length(wiz$fwf_widths)]) + 1L)
 
     rows <- lapply(seq_len(n), function(i) {
-      name_id <- paste0("fwf_col_name_", i)
-      type_id <- paste0("fwf_col_type_", i)
+      name_id <- wiz_input_id("fwf_col_name", seq_no, i)
+      type_id <- wiz_input_id("fwf_col_type", seq_no, i)
       current_name <- if (i <= length(wiz$fwf_col_names)) wiz$fwf_col_names[i] else paste0("col_", i)
       fluidRow(class="mb-1 align-items-center",
         column(1, span(class="badge bg-secondary", i)),
@@ -361,10 +364,11 @@ server_step3_csv <- function(input, output, session, wiz) {
   # Collect FWF column names from inputs
   observe({
     n <- length(wiz$fwf_widths)
+    seq_no <- wiz$open_seq
     if (n == 0) return()
     names_vec <- character(n)
     for (i in seq_len(n)) {
-      v <- input[[paste0("fwf_col_name_", i)]]
+      v <- input[[wiz_input_id("fwf_col_name", seq_no, i)]]
       names_vec[i] <- if (!is.null(v) && nchar(v) > 0) v else paste0("col_", i)
     }
     wiz$fwf_col_names <- names_vec
@@ -373,11 +377,12 @@ server_step3_csv <- function(input, output, session, wiz) {
   # Collect FWF column types from inputs
   observe({
     n <- length(wiz$fwf_widths)
+    seq_no <- wiz$open_seq
     if (n == 0) return()
     col_names <- wiz$fwf_col_names
     types_vec <- character(n)
     for (i in seq_len(n)) {
-      v <- input[[paste0("fwf_col_type_", i)]]
+      v <- input[[wiz_input_id("fwf_col_type", seq_no, i)]]
       types_vec[i] <- if (!is.null(v)) v else "character"
     }
     names(types_vec) <- if (length(col_names) == n) col_names else paste0("col_", seq_len(n))
@@ -422,9 +427,10 @@ server_step3_csv <- function(input, output, session, wiz) {
     # set itself changes (handled by the reactive reads above). Per CLAUDE.md,
     # isolate() is the wizard's standard tool for exactly this.
     isolate({
+      seq_no  <- wiz$open_seq
       reasons <- wiz$col_name_reasons
       rows <- lapply(seq_along(cols), function(i) {
-        name_id <- paste0("csv_name_", i)
+        name_id <- wiz_input_id("csv_name", seq_no, i)
         current <- if (i <= length(wiz$col_names)) wiz$col_names[i] else paste0("col_", i)
         left    <- if (has_header) cols[i] else paste0("col_", i)
         hint    <- if (length(reasons) >= i && nzchar(reasons[i]))
@@ -452,11 +458,12 @@ server_step3_csv <- function(input, output, session, wiz) {
     req(input$wiz_format == "csv")
     has_header <- isTRUE(as.logical(input$wiz_has_header %||% "TRUE"))
     cols <- wiz$csv_col_names_detected
+    seq_no <- wiz$open_seq
     req(!is.null(cols), length(cols) > 0)
     if (!csv_needs_naming(wiz, has_header)) return()
     names_vec <- character(length(cols))
     for (i in seq_along(cols)) {
-      v <- input[[paste0("csv_name_", i)]]
+      v <- input[[wiz_input_id("csv_name", seq_no, i)]]
       names_vec[i] <- if (!is.null(v) && nchar(v) > 0) v
         else if (i <= length(wiz$col_names)) wiz$col_names[i]
         else paste0("col_", i)
@@ -510,7 +517,7 @@ server_step3_csv <- function(input, output, session, wiz) {
 }
 
 # Helper to trigger CSV re-parse
-trigger_csv_preview <- function(input, wiz) {
+trigger_csv_preview <- function(input, wiz, threshold = 0.90) {
   path <- wiz$current_preview_path
   if (is.null(path) || nchar(path) == 0) return()
 
@@ -565,7 +572,8 @@ trigger_csv_preview <- function(input, wiz) {
     if (length(wiz$col_names) == ncols) names(df) <- wiz$col_names
 
     # Infer types from sample
-    wiz$col_types_inferred <- vapply(df, function(x) infer_col_type_simple(x), character(1))
+    wiz$col_types_inferred <- vapply(df, function(x)
+      infer_col_type_simple(x, threshold = threshold), character(1))
     wiz$csv_preview_df <- df
   }, error=function(e) {
     wiz$csv_preview_df <- data.frame(Error=paste("Parse failed:", e$message))

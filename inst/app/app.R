@@ -37,7 +37,7 @@ local({
     read_global_config(global_config_path(get_config_dir())),
     error = function(e) list()
   )
-  register_report_resource_path(gcfg$report_output_dir, get_config_dir())
+  register_all_report_paths(get_config_dir(), gcfg)
 })
 
 # ── UI ────────────────────────────────────────────────────────────────
@@ -89,7 +89,9 @@ shinyApp(
           gcfg <- gcfg_rv()
           db_path <- effective_db_path(config_dir(), gcfg, cfg$known$snapshot_db)
           last_runs <- read_snapshot_history(db_path, ds, n=5)
-          ui_dataset_panel(ds, cfg, last_runs, gcfg)
+          report_prefix <- report_url_prefix(ds, cfg$known$report_output_dir,
+                                             config_dir(), gcfg)
+          ui_dataset_panel(ds, cfg, last_runs, gcfg, report_prefix)
         } else {
           tagList(
             h4("Datasets", style="margin-bottom:16px;"),
@@ -118,15 +120,19 @@ shinyApp(
 
       gcfg <- gcfg_rv()
 
+      # One status query per distinct snapshot DB (not per dataset): group the
+      # datasets by their effective DB path, then batch-read latest statuses.
+      ds_db <- vapply(datasets, function(ds) {
+        k <- tryCatch(read_config(file.path(config_dir(), paste0(ds, ".yml")))$known,
+                      error = function(e) NULL)
+        effective_db_path(config_dir(), gcfg, k$snapshot_db)
+      }, character(1))
+      statuses <- character(0)
+      for (db in unique(ds_db)) statuses <- c(statuses, read_latest_statuses(db))
+
       items <- lapply(datasets, function(ds) {
-        # Honour a per-dataset snapshot_db override (matches the dataset panel)
-        ds_cfg <- tryCatch(
-          read_config(file.path(config_dir(), paste0(ds, ".yml")))$known,
-          error = function(e) NULL
-        )
-        db_path <- effective_db_path(config_dir(), gcfg, ds_cfg$snapshot_db)
-        last_run <- read_snapshot_history(db_path, ds, n=1)
-        status_text <- if (nrow(last_run) > 0) last_run$overall_status[1] else ""
+        status_text <- unname(statuses[ds])
+        status_text <- if (length(status_text) == 1 && !is.na(status_text)) status_text else ""
         active <- isTRUE(rv$active_dataset == ds)
 
         tags$div(
@@ -199,7 +205,7 @@ shinyApp(
 
     # ── Initialise sub-servers ──────────────────────────────────────
     wiz <- server_wizard(input, output, session, rv, config_dir, gcfg_rv)
-    server_step3_csv(input, output, session, wiz)
+    server_step3_csv(input, output, session, wiz, gcfg_rv)
     server_global(input, output, session, rv, config_dir, gcfg_rv)
     server_run(input, output, session, rv, config_dir, gcfg_rv)
     server_history(input, output, session, rv, config_dir, gcfg_rv)
@@ -255,7 +261,7 @@ shinyApp(
         )
         yaml::write_yaml(default_cfg, global_config_path(cd))
         gcfg_rv(read_global_config(global_config_path(cd)))
-        register_report_resource_path(default_cfg$report_output_dir, cd)
+        register_all_report_paths(cd, default_cfg)
         rv$active_section <- "global"
         showNotification("Project created. Review the settings below.",
                          type = "message", duration = 5)

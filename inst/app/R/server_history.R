@@ -38,10 +38,25 @@ server_history <- function(input, output, session, rv, config_dir, gcfg_rv) {
       ))
     }
 
-    # Build direct /dq_reports/<file> links — avoids Shiny round-trip and popup blocking.
+    # Build direct report links — avoids Shiny round-trip and popup blocking.
     # escape = FALSE below applies to ALL columns, so anything interpolated here
     # must be escaped by hand — file_name in particular is supplier-controlled.
-    filename <- make_report_filename(df$dataset_name, df$run_timestamp)
+    # Prefer the filename recorded by dqcheckr >= 0.2.3; reconstruct from the
+    # run timestamp only for older rows. Rows whose render failed get no link.
+    filename <- ifelse(!is.na(df$report_file), df$report_file,
+                       make_report_filename(df$dataset_name, df$run_timestamp))
+    failed   <- !is.na(df$render_status) & df$render_status == "failed"
+
+    # Per-dataset URL prefix: datasets with a report_output_dir override are
+    # served under their own resource path (see report_url_prefix()).
+    cd   <- config_dir()
+    gcfg <- gcfg_rv()
+    prefixes <- vapply(unique(df$dataset_name), function(ds) {
+      known <- tryCatch(read_config(file.path(cd, paste0(ds, ".yml")))$known,
+                        error = function(e) NULL)
+      report_url_prefix(ds, known$report_output_dir, cd, gcfg)
+    }, character(1))
+    row_prefix <- unname(prefixes[df$dataset_name])
 
     display_df <- data.frame(
       ` ` = sprintf(
@@ -53,9 +68,11 @@ server_history <- function(input, output, session, rv, config_dir, gcfg_rv) {
       Status  = vapply(df$overall_status, status_badge_html, character(1)),
       Fails   = df$check_fail_count,
       Rows    = df$row_count,
-      Report  = sprintf(
-        '<a href="javascript:void(0)" onclick="window.open(\'/dq_reports/%s\',\'_blank\')">Open</a>',
-        url_encode_filename(filename)),
+      Report  = ifelse(failed,
+        '<span class="text-muted fst-italic">render failed</span>',
+        sprintf(
+          '<a href="javascript:void(0)" onclick="window.open(\'/%s/%s\',\'_blank\')">Open</a>',
+          row_prefix, url_encode_filename(filename))),
       stringsAsFactors = FALSE, check.names = FALSE
     )
     DT::datatable(display_df,

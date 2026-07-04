@@ -6,8 +6,10 @@ server_run <- function(input, output, session, rv, config_dir, gcfg_rv) {
     r_process  = NULL,
     log_path   = NULL,
     log_lines  = character(0),
+    log_bytes  = NULL,             # last seen log size — skip unchanged reads
     status     = "idle",
     report_path = NULL,
+    report_prefix = "dq_reports",  # URL prefix for the running dataset's reports
     error_msg  = NULL
   )
 
@@ -35,12 +37,14 @@ server_run <- function(input, output, session, rv, config_dir, gcfg_rv) {
     if (!safe_file_exists(cfg_path))
       issues <- c(issues, paste("Config file not found:", cfg_path))
 
+    ds_db <- NULL
     if (safe_file_exists(cfg_path)) {
       cfg_result <- tryCatch(read_config(cfg_path), error = function(e) e)
       if (inherits(cfg_result, "error")) {
         issues <- c(issues, paste("Config could not be parsed:", conditionMessage(cfg_result)))
       } else {
         cfg <- cfg_result$known
+        ds_db <- cfg$snapshot_db
         # Resolve relative paths against deployment root before checking —
         # the Shiny process's getwd() is the package install dir, not the
         # project root, so raw relative paths would always fail here.
@@ -53,8 +57,9 @@ server_run <- function(input, output, session, rv, config_dir, gcfg_rv) {
       }
     }
 
-    db_path <- resolve_infra_path(gcfg$snapshot_db, cd,
-                                  default = "data/snapshots.sqlite", mustWork = FALSE)
+    # Honour a per-dataset snapshot_db override — validating only the global
+    # path let a broken override sail through precheck and fail at run time.
+    db_path <- effective_db_path(cd, gcfg, ds_db)
     if (nchar(db_path) > 0) {
       db_parent <- dirname(db_path)
       if (!safe_dir_exists(db_parent))
@@ -90,9 +95,16 @@ server_run <- function(input, output, session, rv, config_dir, gcfg_rv) {
 
     rv_run$log_path  <- tempfile("dqcheckr_run_", fileext=".log")
     rv_run$log_lines <- character(0)
+    rv_run$log_bytes <- NULL
     rv_run$status    <- "running"
     rv_run$report_path <- NULL
     rv_run$error_msg   <- NULL
+    # URL prefix for this dataset's reports (per-dataset report_output_dir
+    # overrides are served under their own resource path).
+    known <- tryCatch(read_config(file.path(cd, paste0(ds, ".yml")))$known,
+                      error = function(e) NULL)
+    rv_run$report_prefix <- report_url_prefix(ds, known$report_output_dir,
+                                              cd, gcfg_rv())
 
     rv_run$r_process <- callr::r_bg(
       func   = function(dn, cd) dqcheckr::run_dq_check(dn, config_dir=cd),
@@ -112,9 +124,15 @@ server_run <- function(input, output, session, rv, config_dir, gcfg_rv) {
     req(rv_run$status == "running")
     invalidateLater(200)
 
+    # Only re-read (and re-scroll) when the log actually grew — reading the
+    # whole file every tick is O(n^2) I/O over the run.
     if (safe_file_exists(rv_run$log_path)) {
-      rv_run$log_lines <- readLines(rv_run$log_path, warn=FALSE)
-      session$sendCustomMessage("scroll_log", list())
+      sz <- file.size(rv_run$log_path)
+      if (!identical(sz, rv_run$log_bytes)) {
+        rv_run$log_bytes <- sz
+        rv_run$log_lines <- readLines(rv_run$log_path, warn=FALSE)
+        session$sendCustomMessage("scroll_log", list())
+      }
     }
 
     proc <- rv_run$r_process
@@ -140,6 +158,10 @@ server_run <- function(input, output, session, rv, config_dir, gcfg_rv) {
       rv_run$status <- if (!is.null(result)) as.character(result$status) else "error"
       if (!is.null(result)) rv_run$report_path <- result$report_path
       rv$history_refresh <- Sys.time()
+      # Re-register report resource paths: the reports directory may only now
+      # exist (dqcheckr creates it on first run), and per-dataset dirs may
+      # have received their first report.
+      register_all_report_paths(config_dir(), gcfg_rv())
     }
   })
 
@@ -176,7 +198,8 @@ server_run <- function(input, output, session, rv, config_dir, gcfg_rv) {
     div(class="d-flex gap-3 align-items-center mt-2",
       status_badge(toupper(s)),
       if (s %in% c("PASS","WARN","FAIL") && !is.null(rv_run$report_path)) {
-        report_url <- paste0("/dq_reports/", basename(rv_run$report_path))
+        report_url <- paste0("/", rv_run$report_prefix, "/",
+                             utils::URLencode(basename(rv_run$report_path), reserved = TRUE))
         div(
           tags$a(href=report_url, target="_blank",
                  class="btn btn-outline-primary btn-sm", "Open report ↗"),

@@ -253,23 +253,25 @@ test_that("utc_to_local_display vectorises over multiple timestamps", {
   expect_equal(result, c("2026-05-31 12:08:08", "2026-06-01 00:00:00"))
 })
 
-test_that("utc_to_local_display returns NA for missing or unparseable input", {
+test_that("utc_to_local_display passes unparseable input through, NA stays NA", {
   withr::local_timezone("UTC")
   expect_true(is.na(utc_to_local_display(NA_character_)))
-  expect_true(is.na(utc_to_local_display("not-a-timestamp")))
+  # 0.2.1 (L-05): unparseable strings are shown verbatim, not as "NA"
+  expect_equal(utc_to_local_display("not-a-timestamp"), "not-a-timestamp")
 })
 
 test_that("utc_to_local_display does not parse the space-separated timestamps used by some test fixtures", {
   # Several fixtures elsewhere in this suite (e.g. test-history.R) use
   # space-separated timestamps like "2026-05-31 12:08:08" rather than the
   # production "T...Z" form. utc_to_local_display only understands the
-  # production format — a space-separated string silently parses to NA
-  # rather than producing a converted display string. Pinning that behaviour
-  # here so a future fixture rewrite that switches to production-format
-  # timestamps doesn't go unnoticed (and so nobody "fixes" this function to
-  # also accept the space form without realising real data never uses it).
+  # production format — a space-separated string is NOT converted (no
+  # timezone shift); since 0.2.1 it is passed through verbatim rather than
+  # displayed as "NA". Pinning that behaviour here so a future fixture
+  # rewrite that switches to production-format timestamps doesn't go
+  # unnoticed (and so nobody "fixes" this function to also accept the space
+  # form without realising real data never uses it).
   withr::local_timezone("UTC")
-  expect_true(is.na(utc_to_local_display("2026-05-31 12:08:08")))
+  expect_equal(utc_to_local_display("2026-05-31 12:08:08"), "2026-05-31 12:08:08")
 })
 
 # ── sanitize_r_name / suggest_col_names / csv_needs_naming (B-08) ─────────────
@@ -465,4 +467,105 @@ test_that("effective_db_path leaves absolute paths unchanged", {
   file.create(abs)
   expect_equal(effective_db_path("/some/config", list(snapshot_db = abs)),
                normalizePath(abs, mustWork = FALSE))
+})
+
+# ── utc_to_local_display fallback (0.2.1, L-05) ──────────────────────────────
+
+test_that("utc_to_local_display shows unparseable timestamps as-is, not 'NA'", {
+  expect_equal(utc_to_local_display("2026/07/04 oddball"), "2026/07/04 oddball")
+  good <- utc_to_local_display("2026-07-04T01:02:03Z")
+  expect_false(is.na(good))
+  expect_match(good, "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$")
+})
+
+# ── infer_col_type_simple threshold (0.2.1, L-07) ────────────────────────────
+
+test_that("infer_col_type_simple honours the threshold argument", {
+  x <- c(rep("1", 8), "a", "b")           # 80% numeric
+  expect_equal(infer_col_type_simple(x), "character")            # default 0.90
+  expect_equal(infer_col_type_simple(x, threshold = 0.80), "numeric")
+})
+
+test_that("wiz_type_threshold resolves override > global > default", {
+  gcfg <- list(default_rules = list(type_inference_threshold = 0.85))
+  expect_equal(wiz_type_threshold(list(rule_overrides = list()), gcfg), 0.85)
+  expect_equal(wiz_type_threshold(
+    list(rule_overrides = list(type_inference_threshold = 0.7)), gcfg), 0.7)
+  expect_equal(wiz_type_threshold(list(rule_overrides = list()), list()), 0.90)
+})
+
+# ── report_url_prefix (0.2.1, G-05) ──────────────────────────────────────────
+
+test_that("report_url_prefix picks the per-dataset prefix only for overrides", {
+  root    <- withr::local_tempdir()
+  cfg_dir <- file.path(root, "config"); dir.create(cfg_dir)
+  gcfg <- list(report_output_dir = "reports/")
+  expect_equal(report_url_prefix("ds1", "",         cfg_dir, gcfg), "dq_reports")
+  expect_equal(report_url_prefix("ds1", "reports/", cfg_dir, gcfg), "dq_reports")
+  expect_equal(report_url_prefix("ds1", "other_reports/", cfg_dir, gcfg),
+               "dq_reports_ds1")
+})
+
+# ── read_snapshot_history vs old-schema databases (0.2.1, G-05) ──────────────
+
+test_that("read_snapshot_history defaults render_status/report_file for old DBs", {
+  db <- withr::local_tempfile(fileext = ".sqlite")
+  con <- DBI::dbConnect(RSQLite::SQLite(), db)
+  DBI::dbExecute(con, "CREATE TABLE snapshots (
+    id INTEGER PRIMARY KEY, dataset_name TEXT, run_timestamp TEXT,
+    file_name TEXT, row_count INTEGER, col_count INTEGER,
+    check_pass_count INTEGER, check_warn_count INTEGER,
+    check_fail_count INTEGER, check_info_count INTEGER, overall_status TEXT)")
+  DBI::dbExecute(con, "INSERT INTO snapshots
+    (dataset_name, run_timestamp, file_name, row_count, col_count,
+     check_pass_count, check_warn_count, check_fail_count, check_info_count,
+     overall_status)
+    VALUES ('old_ds', '2026-01-01T00:00:00Z', 'f.csv', 10, 2, 5, 0, 0, 1, 'PASS')")
+  DBI::dbDisconnect(con)
+
+  df <- read_snapshot_history(db, "old_ds")
+  expect_equal(nrow(df), 1)
+  expect_equal(df$render_status, "success")
+  expect_true(is.na(df$report_file))
+})
+
+# ── read_latest_statuses (0.2.1, P-06) ───────────────────────────────────────
+
+test_that("read_latest_statuses returns one latest status per dataset", {
+  db <- withr::local_tempfile(fileext = ".sqlite")
+  con <- DBI::dbConnect(RSQLite::SQLite(), db)
+  DBI::dbExecute(con, "CREATE TABLE snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, dataset_name TEXT, overall_status TEXT)")
+  for (row in list(c("ds_a","PASS"), c("ds_b","PASS"),
+                   c("ds_a","FAIL"), c("ds_b","WARN"))) {
+    DBI::dbExecute(con,
+      "INSERT INTO snapshots (dataset_name, overall_status) VALUES (?, ?)",
+      list(row[1], row[2]))
+  }
+  DBI::dbDisconnect(con)
+
+  st <- read_latest_statuses(db)
+  expect_equal(unname(st["ds_a"]), "FAIL")
+  expect_equal(unname(st["ds_b"]), "WARN")
+})
+
+test_that("read_latest_statuses returns empty for missing databases", {
+  expect_length(read_latest_statuses(tempfile(fileext = ".sqlite")), 0)
+  expect_length(read_latest_statuses(""), 0)
+  expect_length(read_latest_statuses(NULL), 0)
+})
+
+test_that("read_snapshot_history handles zero-row results from old-schema DBs cleanly", {
+  db <- withr::local_tempfile(fileext = ".sqlite")
+  con <- DBI::dbConnect(RSQLite::SQLite(), db)
+  DBI::dbExecute(con, "CREATE TABLE snapshots (
+    id INTEGER PRIMARY KEY, dataset_name TEXT, run_timestamp TEXT,
+    file_name TEXT, row_count INTEGER, col_count INTEGER,
+    check_pass_count INTEGER, check_warn_count INTEGER,
+    check_fail_count INTEGER, check_info_count INTEGER, overall_status TEXT)")
+  DBI::dbDisconnect(con)
+
+  expect_no_message(df <- read_snapshot_history(db, "no_such_ds"))
+  expect_equal(nrow(df), 0)
+  expect_true(all(c("render_status", "report_file") %in% names(df)))
 })

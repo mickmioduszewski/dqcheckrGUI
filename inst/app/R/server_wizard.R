@@ -1,6 +1,12 @@
 # Config wizard server logic — state management, navigation, steps 1-2, 4-8
 # Step 3 CSV/FWF split into server_step3_csv.R
 
+# Positional wizard input id, namespaced by the wizard-open sequence number.
+# Inputs are never destroyed when the wizard closes, so without the sequence
+# component a collector firing for dataset B could read checkbox/select state
+# left over from dataset A at the same position (G-03).
+wiz_input_id <- function(prefix, seq, i) paste0(prefix, "_", seq, "_", i)
+
 server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
 
   # ── Wizard state ─────────────────────────────────────────────────────
@@ -8,6 +14,8 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
   # reset state when the wizard is opened for a new dataset.
   .wiz_defaults <- list(
     mode="new", dataset_name="", description="",
+    original_name="",            # edit mode: the name the config was opened under
+    open_seq=0L,                 # bumped on every open; namespaces positional inputs
     file_mode="folder", folder="", current_file="", previous_file="",
     format="csv", encoding="UTF-8", delimiter=",", quote_char='"',
     has_header=TRUE, csv_skip=0L,
@@ -33,6 +41,14 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
   wiz <- do.call(reactiveValues, .wiz_defaults)
 
   open_wizard <- function(mode, dataset_name=NULL) {
+    # Always reset to defaults first — edit mode previously overlaid the
+    # config on top of whatever the last wizard session left behind, leaking
+    # every wiz field read_config() doesn't produce (raw_header_names,
+    # inferred types, previews, sniff conflicts, ...) across opens (G-03).
+    seq_next <- isolate(wiz$open_seq) + 1L
+    for (nm in names(.wiz_defaults)) wiz[[nm]] <- .wiz_defaults[[nm]]
+    wiz$open_seq <- seq_next
+
     if (mode == "edit" && !is.null(dataset_name)) {
       path <- file.path(config_dir(), paste0(dataset_name, ".yml"))
       if (safe_file_exists(path)) {
@@ -42,6 +58,7 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
           for (nm in names(k)) wiz[[nm]] <- k[[nm]]
           wiz$extra_keys    <- cfg$extra
           wiz$mode          <- "edit"
+          wiz$original_name <- dataset_name
           wiz$current_step  <- 1L
           # Trigger file preview
           preview_path <- if (nchar(k$folder %||%"") > 0) {
@@ -54,8 +71,6 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
           }
         }
       }
-    } else {
-      for (nm in names(.wiz_defaults)) wiz[[nm]] <- .wiz_defaults[[nm]]
     }
     rv$wizard_open <- TRUE
     rv$active_section <- "wizard"
@@ -181,7 +196,11 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
     if (!is_valid_r_name(v))
       return("Must start with a letter; only letters, numbers, and underscores.")
     existing <- list_dataset_configs(config_dir())
-    if (wiz$mode == "new" && v %in% existing)
+    # In edit mode the dataset's own (original) name is legitimate; renaming
+    # onto any OTHER existing dataset would silently overwrite it (G-07).
+    clash <- v %in% existing &&
+             !(wiz$mode == "edit" && identical(v, wiz$original_name))
+    if (clash)
       return(sprintf("A dataset named '%s' already exists.", v))
   })
   iv_step1$enable()
@@ -394,6 +413,7 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
     req(length(cols) > 0)
 
     isolate({                      # isolate: checkbox/select state reads don't subscribe
+      seq_no    <- wiz$open_seq
       types    <- wiz$col_types_inferred
       overrides <- wiz$col_types_override
       key_cols  <- wiz$key_columns
@@ -410,14 +430,14 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
           column(3, tags$strong(col, style="font-size:13px;")),
           column(2, span(class="badge bg-light text-dark border", inf_type)),
           column(2,
-            selectInput(paste0("s4_type_", i), NULL, width="100%",
+            selectInput(wiz_input_id("s4_type", seq_no, i), NULL, width="100%",
               choices=c("auto","character","numeric","date"), selected=ovr_type)
           ),
           column(2,
-            checkboxInput(paste0("s4_key_", i), "Key col", value=is_key)
+            checkboxInput(wiz_input_id("s4_key", seq_no, i), "Key col", value=is_key)
           ),
           column(3,
-            checkboxInput(paste0("s4_exp_", i), "Expected", value=is_exp)
+            checkboxInput(wiz_input_id("s4_exp", seq_no, i), "Expected", value=is_exp)
           )
         )
       })
@@ -435,19 +455,21 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
   # Collect step 4 inputs
   observe({
     cols <- wiz$col_names
+    seq_no <- wiz$open_seq
     if (length(cols) == 0) return()
-    # Bail out if step 4 UI hasn't rendered yet (inputs don't exist).
-    # This prevents wiping config-loaded values during edit mode step 3 auto-parse.
-    if (is.null(input[[paste0("s4_type_1")]])) return()
+    # Bail out until THIS open's step-4 UI has rendered. The id carries the
+    # open sequence, so inputs surviving from a previously opened dataset can
+    # neither satisfy this guard nor be read positionally below (G-03).
+    if (is.null(input[[wiz_input_id("s4_type", seq_no, 1)]])) return()
     key_cols <- character(0)
     exp_cols <- character(0)
     overrides <- list()
     for (i in seq_along(cols)) {
       col <- cols[i]
-      type_val <- input[[paste0("s4_type_", i)]] %||% "auto"
+      type_val <- input[[wiz_input_id("s4_type", seq_no, i)]] %||% "auto"
       if (type_val != "auto") overrides[[col]] <- type_val
-      if (isTRUE(input[[paste0("s4_key_", i)]])) key_cols <- c(key_cols, col)
-      if (isTRUE(input[[paste0("s4_exp_", i)]])) exp_cols <- c(exp_cols, col)
+      if (isTRUE(input[[wiz_input_id("s4_key", seq_no, i)]])) key_cols <- c(key_cols, col)
+      if (isTRUE(input[[wiz_input_id("s4_exp", seq_no, i)]])) exp_cols <- c(exp_cols, col)
     }
     wiz$col_types_override <- overrides
     wiz$key_columns <- key_cols
@@ -456,12 +478,16 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
 
   observeEvent(input$step4_select_all_expected, {
     cols <- wiz$col_names
-    for (i in seq_along(cols)) updateCheckboxInput(session, paste0("s4_exp_", i), value=TRUE)
+    seq_no <- wiz$open_seq
+    for (i in seq_along(cols))
+      updateCheckboxInput(session, wiz_input_id("s4_exp", seq_no, i), value=TRUE)
     wiz$expected_columns <- cols
   })
   observeEvent(input$step4_select_none_expected, {
     cols <- wiz$col_names
-    for (i in seq_along(cols)) updateCheckboxInput(session, paste0("s4_exp_", i), value=FALSE)
+    seq_no <- wiz$open_seq
+    for (i in seq_along(cols))
+      updateCheckboxInput(session, wiz_input_id("s4_exp", seq_no, i), value=FALSE)
     wiz$expected_columns <- character(0)
   })
 
@@ -474,6 +500,7 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
       return(p(class="text-muted fst-italic", "No columns defined yet. Complete Step 3 first."))
 
     isolate({
+    seq_no <- wiz$open_seq
     types <- if (length(wiz$col_types_inferred) > 0) wiz$col_types_inferred else rep("character", length(cols))
 
     panels <- lapply(seq_along(cols), function(i) {
@@ -489,7 +516,7 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
           existing_vals <- rules$allowed_values %||% character(0)
           div(class="mt-1",
             tags$label(paste0("Allowed values (QC-09)"), class="form-label form-label-sm"),
-            selectizeInput(paste0("s5_allowed_", i), NULL,
+            selectizeInput(wiz_input_id("s5_allowed", seq_no, i), NULL,
               choices  = existing_vals,
               selected = existing_vals,
               multiple = TRUE,
@@ -504,9 +531,9 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
         },
         if (ctype == "numeric") {
           fluidRow(
-            column(4, numericInput(paste0("s5_min_", i), "Min value (QC-10)",
+            column(4, numericInput(wiz_input_id("s5_min", seq_no, i), "Min value (QC-10)",
                    value=rules$min_value, min=NA, max=NA)),
-            column(4, numericInput(paste0("s5_max_", i), "Max value (QC-10)",
+            column(4, numericInput(wiz_input_id("s5_max", seq_no, i), "Max value (QC-10)",
                    value=rules$max_value, min=NA, max=NA))
           )
         }
@@ -516,18 +543,24 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
         div(class="mt-2",
           tags$label("Regex pattern (QC-13)", class="form-label form-label-sm"),
           div(class="d-flex gap-2",
-            textInput(paste0("s5_pattern_", i), NULL,
+            textInput(wiz_input_id("s5_pattern", seq_no, i), NULL,
                       value=rules$pattern %||% "", placeholder="e.g. ^[A-Z]{2}$", width="300px"),
-            actionButton(paste0("s5_test_regex_", i), "Test",
-                         class="btn btn-outline-secondary btn-sm", style="height:38px;")
+            # Delegated: ONE observer handles every Test button (the previous
+            # per-column observeEvent factory re-registered observers on each
+            # col_names change without destroying old ones — G-04).
+            tags$button("Test", type="button",
+                        class="btn btn-outline-secondary btn-sm", style="height:38px;",
+                        onclick=sprintf(
+                          "Shiny.setInputValue('s5_test_regex_click', {i:%d, seq:%d, t:Date.now()}, {priority:'event'});",
+                          i, seq_no))
           ),
-          uiOutput(paste0("s5_regex_result_", i))
+          uiOutput(wiz_input_id("s5_regex_result", seq_no, i))
         ),
         fluidRow(
-          column(4, numericInput(paste0("s5_maxmiss_", i), "Max missing rate",
+          column(4, numericInput(wiz_input_id("s5_maxmiss", seq_no, i), "Max missing rate",
                  value=rules$max_missing_rate, min=0, max=1, step=0.01)),
           if (ctype == "numeric") {
-            column(4, numericInput(paste0("s5_maxmeanshift_", i), "Max mean shift (%)",
+            column(4, numericInput(wiz_input_id("s5_maxmeanshift", seq_no, i), "Max mean shift (%)",
                    value=rules$max_numeric_mean_shift_pct, min=0, max=100, step=1))
           }
         )
@@ -554,57 +587,59 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
     }) # end isolate
   })
 
-  # Regex test observers
-  observe({
-    cols <- wiz$col_names
-    lapply(seq_along(cols), function(i) {
-      local({
-        ii <- i
-        col <- cols[ii]
-        observeEvent(input[[paste0("s5_test_regex_", ii)]], {
-          pattern <- input[[paste0("s5_pattern_", ii)]] %||% ""
-          if (nchar(pattern) == 0) return()
-          # Test against sample
-          sample_vals <- if (!is.null(wiz$csv_preview_df)) {
-            v <- wiz$csv_preview_df[[col]]
-            v[!is.na(v) & nchar(as.character(v)) > 0]
-          } else character(0)
+  # Regex test — one delegated observer for every column's Test button. The
+  # button's onclick carries {i, seq}, so no per-column observers exist to
+  # accumulate across col_names changes (G-04), and a click from a stale
+  # wizard session (old seq) writes to an output nothing displays.
+  observeEvent(input$s5_test_regex_click, {
+    click  <- input$s5_test_regex_click
+    ii     <- as.integer(click$i)
+    seq_no <- as.integer(click$seq)
+    cols   <- wiz$col_names
+    if (is.na(ii) || ii < 1 || ii > length(cols)) return()
+    col     <- cols[ii]
+    pattern <- input[[wiz_input_id("s5_pattern", seq_no, ii)]] %||% ""
+    if (nchar(pattern) == 0) return()
+    # Test against sample
+    sample_vals <- if (!is.null(wiz$csv_preview_df)) {
+      v <- wiz$csv_preview_df[[col]]
+      v[!is.na(v) & nchar(as.character(v)) > 0]
+    } else character(0)
 
-          result <- tryCatch({
-            err_msg <- tryCatch({ grepl(pattern, "test", perl=TRUE); NULL },
-                                error=function(e) e$message)
-            if (!is.null(err_msg)) {
-              list(type="error", msg=paste("Invalid regex:", err_msg))
-            } else if (length(sample_vals) == 0) {
-              list(type="info", msg="No sample data to test against.")
-            } else {
-              matches <- grepl(pattern, sample_vals, perl=TRUE)
-              n_fail <- sum(!matches)
-              if (n_fail == 0) {
-                list(type="success", msg=sprintf("Pattern matches all %d non-empty values.", length(sample_vals)))
-              } else {
-                fail_examples <- paste(head(sample_vals[!matches], 5), collapse="', '")
-                list(type="warning", msg=sprintf("Pattern does not match %d value(s): '%s'", n_fail, fail_examples))
-              }
-            }
-          }, error=function(e) list(type="error", msg=e$message))
+    result <- tryCatch({
+      err_msg <- tryCatch({ suppressWarnings(grepl(pattern, "test", perl=TRUE)); NULL },
+                          error=function(e) e$message)
+      if (!is.null(err_msg)) {
+        list(type="error", msg=paste("Invalid regex:", err_msg))
+      } else if (length(sample_vals) == 0) {
+        list(type="info", msg="No sample data to test against.")
+      } else {
+        matches <- grepl(pattern, sample_vals, perl=TRUE)
+        n_fail <- sum(!matches)
+        if (n_fail == 0) {
+          list(type="success", msg=sprintf("Pattern matches all %d non-empty values.", length(sample_vals)))
+        } else {
+          fail_examples <- paste(head(sample_vals[!matches], 5), collapse="', '")
+          list(type="warning", msg=sprintf("Pattern does not match %d value(s): '%s'", n_fail, fail_examples))
+        }
+      }
+    }, error=function(e) list(type="error", msg=e$message))
 
-          output[[paste0("s5_regex_result_", ii)]] <- renderUI({
-            cls <- switch(result$type, success="alert-success", warning="alert-warning",
-                          error="alert-danger", info="alert-info", "alert-info")
-            div(class=paste("alert p-1 mt-1", cls), style="font-size:11px;", result$msg)
-          })
-        })
-      })
+    output[[wiz_input_id("s5_regex_result", seq_no, ii)]] <- renderUI({
+      cls <- switch(result$type, success="alert-success", warning="alert-warning",
+                    error="alert-danger", info="alert-info", "alert-info")
+      div(class=paste("alert p-1 mt-1", cls), style="font-size:11px;", result$msg)
     })
   })
 
   # Collect step 5 inputs
   observe({
     cols <- wiz$col_names
+    seq_no <- wiz$open_seq
     if (length(cols) == 0) return()
-    # Bail out if step 5 UI hasn't rendered yet.
-    if (is.null(input[[paste0("s5_maxmiss_1")]])) return()
+    # Bail out until THIS open's step-5 UI has rendered (same G-03 guard as
+    # the step-4 collector — the id carries the open sequence).
+    if (is.null(input[[wiz_input_id("s5_maxmiss", seq_no, 1)]])) return()
     types <- wiz$col_types_inferred
     col_rules <- list()
     for (i in seq_along(cols)) {
@@ -612,17 +647,17 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
       ctype <- if (!is.null(wiz$col_types_override[[col]])) wiz$col_types_override[[col]]
                else if (i <= length(types)) types[i] else "character"
       rules <- list()
-      av <- input[[paste0("s5_allowed_", i)]]
+      av <- input[[wiz_input_id("s5_allowed", seq_no, i)]]
       if (!is.null(av) && length(av) > 0 && any(nchar(av) > 0)) rules$allowed_values <- av
-      minv <- input[[paste0("s5_min_", i)]]
-      maxv <- input[[paste0("s5_max_", i)]]
+      minv <- input[[wiz_input_id("s5_min", seq_no, i)]]
+      maxv <- input[[wiz_input_id("s5_max", seq_no, i)]]
       if (!is.null(minv) && !is.na(minv)) rules$min_value <- minv
       if (!is.null(maxv) && !is.na(maxv)) rules$max_value <- maxv
-      pat <- input[[paste0("s5_pattern_", i)]]
+      pat <- input[[wiz_input_id("s5_pattern", seq_no, i)]]
       if (!is.null(pat) && nchar(pat) > 0) rules$pattern <- pat
-      miss <- input[[paste0("s5_maxmiss_", i)]]
+      miss <- input[[wiz_input_id("s5_maxmiss", seq_no, i)]]
       if (!is.null(miss) && !is.na(miss)) rules$max_missing_rate <- miss
-      ms   <- input[[paste0("s5_maxmeanshift_", i)]]
+      ms   <- input[[wiz_input_id("s5_maxmeanshift", seq_no, i)]]
       if (!is.null(ms) && !is.na(ms)) rules$max_numeric_mean_shift_pct <- ms / 100
       if (length(rules) > 0) col_rules[[col]] <- rules
     }
@@ -707,10 +742,38 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
     nm     <- wiz$dataset_name
     cd     <- config_dir()
     path   <- file.path(cd, paste0(nm, ".yml"))
+
+    # Backstop for G-07: the step-1 validator shows the clash message, but
+    # nothing stops navigation past it — block the overwrite at save time.
+    existing <- list_dataset_configs(cd)
+    clash <- nm %in% existing &&
+             !(wiz$mode == "edit" && identical(nm, wiz$original_name))
+    if (clash) {
+      showModal(modalDialog(
+        title="Name already in use",
+        sprintf("A dataset named '%s' already exists. Choose a different name in Step 1.", nm),
+        easyClose=TRUE
+      ))
+      return()
+    }
+    renamed <- wiz$mode == "edit" && nchar(wiz$original_name) > 0 &&
+               !identical(nm, wiz$original_name)
+
     dir.create(cd, showWarnings=FALSE, recursive=TRUE)
     tryCatch({
       write_config(wiz, wiz$extra_keys, path)
+      if (renamed) {
+        # A rename must not leave the old config behind as a zombie sidebar
+        # entry. Snapshot history stays keyed to the old name by design.
+        old_path <- file.path(cd, paste0(wiz$original_name, ".yml"))
+        if (file.exists(old_path)) file.remove(old_path)
+        showNotification(
+          sprintf("Renamed '%s' to '%s'. Existing run history remains recorded under the old name.",
+                  wiz$original_name, nm),
+          type="warning", duration=8)
+      }
       showNotification(sprintf("Saved: %s", path), type="message", duration=4)
+      register_all_report_paths(cd, gcfg_rv())
       rv$wizard_open <- FALSE
       rv$active_section <- "datasets"
       rv$active_dataset <- nm

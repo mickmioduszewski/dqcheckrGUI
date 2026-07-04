@@ -2,6 +2,32 @@
 
 ## Bug fixes
 
+* Wizard state can no longer leak between datasets: opening the wizard now
+  always resets to defaults before loading a config (edit mode previously
+  overlaid the config on the previous session's leftovers), and positional
+  step-3/4/5 inputs are namespaced per wizard open so stale checkbox/select
+  values from an earlier dataset can never be collected into the current one.
+* The step-5 regex "Test" buttons are handled by a single delegated observer;
+  previously a new set of observers was registered on every column-list
+  change without destroying the old ones.
+* Report links now honour per-dataset `report_output_dir` overrides (each
+  override directory is served under its own resource path), the resource
+  paths are re-registered after every completed run (covering projects whose
+  `reports/` directory is first created by dqcheckr itself), runs whose
+  report rendering failed show "render failed" instead of a dead "Open"
+  link, and links prefer the exact filename recorded by dqcheckr >= 0.2.3
+  over reconstructing it from the run timestamp.
+* Renaming a dataset in edit mode now removes the old config file and warns
+  that run history stays under the old name; renaming onto another existing
+  dataset is blocked (previously it silently overwrote that dataset's
+  config).
+* The pre-run check validates a per-dataset `snapshot_db` override rather
+  than always checking the global path.
+* Unparseable run timestamps display verbatim instead of as "NA"; an empty
+  preview file no longer produces a `max()` warning.
+* The wizard's type-inference preview honours `type_inference_threshold`
+  (dataset override, then global default) instead of a hard-coded 0.90.
+
 * Sidebar status badges and the dataset panel's "Recent runs" table now
   resolve a relative `snapshot_db` path (e.g. the `data/snapshots.sqlite`
   written by the first-run scaffold) against the project root instead of the
@@ -20,6 +46,15 @@
   integer-vs-double comparison artefact).
 * Folder-scan previews in the wizard no longer consider subdirectories when
   picking the most recent file, and the folder file count excludes them.
+
+## Performance
+
+* The sidebar reads the latest status for all datasets with one query per
+  distinct snapshot database instead of one connection + query per dataset
+  per redraw.
+* The run-log poll re-reads the log file only when its size has changed
+  (previously the whole file was re-read every 200 ms for the duration of
+  the run).
 
 # dqcheckrGUI 0.2.0
 

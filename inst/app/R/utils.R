@@ -172,7 +172,8 @@ read_snapshot_history <- function(db_path, dataset_name = NULL, n = 10) {
     id=integer(0), dataset_name=character(0), file_name=character(0),
     run_timestamp=character(0), overall_status=character(0),
     check_fail_count=integer(0), check_warn_count=integer(0),
-    row_count=integer(0), stringsAsFactors=FALSE
+    row_count=integer(0), render_status=character(0),
+    report_file=character(0), stringsAsFactors=FALSE
   )
   if (is.null(db_path) || db_path == "" || !safe_file_exists(db_path)) return(empty)
 
@@ -180,19 +181,23 @@ read_snapshot_history <- function(db_path, dataset_name = NULL, n = 10) {
     con <- DBI::dbConnect(RSQLite::SQLite(), db_path)
     on.exit(DBI::dbDisconnect(con), add=TRUE)
 
-    if (!is.null(dataset_name) && dataset_name != "") {
+    # SELECT * rather than an explicit column list: databases written by
+    # older dqcheckr versions lack the newer columns (render_status,
+    # report_file), and naming them would error the whole query into the
+    # empty fallback. Missing ones are defaulted below instead.
+    df <- if (!is.null(dataset_name) && dataset_name != "") {
       DBI::dbGetQuery(con,
-        "SELECT id, dataset_name, file_name, run_timestamp,
-                overall_status, check_fail_count, check_warn_count, row_count
-         FROM snapshots WHERE dataset_name = ? ORDER BY id DESC LIMIT ?",
+        "SELECT * FROM snapshots WHERE dataset_name = ? ORDER BY id DESC LIMIT ?",
         list(dataset_name, as.integer(n)))
     } else {
       DBI::dbGetQuery(con,
-        "SELECT id, dataset_name, file_name, run_timestamp,
-                overall_status, check_fail_count, check_warn_count, row_count
-         FROM snapshots ORDER BY id DESC LIMIT ?",
+        "SELECT * FROM snapshots ORDER BY id DESC LIMIT ?",
         list(as.integer(n)))
     }
+    # rep(): a plain scalar assignment errors on zero-row results
+    if (is.null(df$render_status)) df$render_status <- rep("success", nrow(df))
+    if (is.null(df$report_file))   df$report_file   <- rep(NA_character_, nrow(df))
+    df
   }, error = function(e) {
     message("read_snapshot_history: query failed for db_path '", db_path,
             "': ", conditionMessage(e))
@@ -200,12 +205,30 @@ read_snapshot_history <- function(db_path, dataset_name = NULL, n = 10) {
   })
 }
 
+# Latest run status per dataset in ONE query (the sidebar previously opened a
+# connection and ran a query per dataset on every redraw). Returns a named
+# character vector: dataset_name -> overall_status.
+read_latest_statuses <- function(db_path) {
+  if (is.null(db_path) || db_path == "" || !safe_file_exists(db_path))
+    return(character(0))
+  tryCatch({
+    con <- DBI::dbConnect(RSQLite::SQLite(), db_path)
+    on.exit(DBI::dbDisconnect(con), add=TRUE)
+    df <- DBI::dbGetQuery(con,
+      "SELECT dataset_name, overall_status FROM snapshots
+       WHERE id IN (SELECT MAX(id) FROM snapshots GROUP BY dataset_name)")
+    stats::setNames(df$overall_status, df$dataset_name)
+  }, error = function(e) character(0))
+}
+
 read_all_snapshot_history <- function(db_path, n = 200) {
   read_snapshot_history(db_path, dataset_name=NULL, n=n)
 }
 
-# Infer column types from a character vector sample (dqcheckr logic)
-infer_col_type_simple <- function(x) {
+# Infer column types from a character vector sample (dqcheckr logic).
+# threshold mirrors dqcheckr's type_inference_threshold so wizard previews
+# agree with run-time classification when a project overrides the default.
+infer_col_type_simple <- function(x, threshold = 0.90) {
   x <- x[!is.na(x) & x != ""]
   if (length(x) == 0) return("unknown")
   date_fmts <- c("%Y-%m-%d","%d/%m/%Y","%m/%d/%Y","%Y%m%d","%d-%m-%Y")
@@ -214,7 +237,7 @@ infer_col_type_simple <- function(x) {
     if (all(!is.na(parsed))) return("date")
   }
   numeric_ok <- suppressWarnings(!is.na(as.numeric(x)))
-  if (mean(numeric_ok) >= 0.90) return("numeric")
+  if (mean(numeric_ok) >= threshold) return("numeric")
   "character"
 }
 
@@ -275,8 +298,56 @@ register_report_resource_path <- function(report_output_dir, config_dir) {
   }
 }
 
-# Convert a UTC ISO timestamp (from the snapshot DB) to a local-time display string.
+# URL prefix a dataset's report links must use: "dq_reports" when the dataset
+# writes to the global report dir, "dq_reports_<ds>" when it has its own
+# report_output_dir override (each override dir gets its own resource path —
+# a single static prefix can only map one directory).
+report_url_prefix <- function(ds, ds_report_dir, config_dir, gcfg) {
+  global_dir <- resolve_infra_path(gcfg$report_output_dir, config_dir,
+                                   default = "reports/", mustWork = FALSE)
+  ds_dir <- if (nchar(ds_report_dir %||% "") > 0)
+    resolve_infra_path(ds_report_dir, config_dir, mustWork = FALSE)
+  else ""
+  if (nzchar(ds_dir) && !identical(ds_dir, global_dir))
+    paste0("dq_reports_", ds)
+  else
+    "dq_reports"
+}
+
+# Register the global reports dir plus one resource path per dataset whose
+# effective report dir differs from it. Called at app startup, after a global
+# config save, after a wizard save, and after each completed run — the last
+# also covers the case where reports/ did not exist at launch and was first
+# created by dqcheckr itself (registration is skipped for missing dirs).
+register_all_report_paths <- function(config_dir, gcfg) {
+  register_report_resource_path(gcfg$report_output_dir, config_dir)
+  global_dir <- resolve_infra_path(gcfg$report_output_dir, config_dir,
+                                   default = "reports/", mustWork = FALSE)
+  for (ds in list_dataset_configs(config_dir)) {
+    known <- tryCatch(
+      read_config(file.path(config_dir, paste0(ds, ".yml")))$known,
+      error = function(e) NULL
+    )
+    if (is.null(known) || nchar(known$report_output_dir %||% "") == 0) next
+    ds_dir <- resolve_infra_path(known$report_output_dir, config_dir,
+                                 mustWork = FALSE)
+    if (nzchar(ds_dir) && !identical(ds_dir, global_dir) && dir.exists(ds_dir))
+      addResourcePath(paste0("dq_reports_", ds), ds_dir)
+  }
+}
+
+# Effective type-inference threshold for wizard-side previews: the dataset's
+# step-6 override, then the global default, then dqcheckr's 0.90.
+wiz_type_threshold <- function(wiz, gcfg) {
+  wiz$rule_overrides$type_inference_threshold %||%
+    gcfg$default_rules$type_inference_threshold %||% 0.90
+}
+
+# Convert a UTC ISO timestamp (from the snapshot DB) to a local-time display
+# string. Timestamps that don't parse (legacy/foreign formats) are shown
+# as-is rather than as the string "NA".
 utc_to_local_display <- function(ts) {
   parsed <- as.POSIXct(ts, format = "%Y-%m-%dT%H:%M:%SZ", tz = "UTC")
-  format(parsed, format = "%Y-%m-%d %H:%M:%S", tz = "")
+  out <- format(parsed, format = "%Y-%m-%d %H:%M:%S", tz = "")
+  ifelse(is.na(parsed), as.character(ts), out)
 }

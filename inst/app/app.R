@@ -87,7 +87,7 @@ shinyApp(
           cfg_path <- file.path(config_dir(), paste0(ds, ".yml"))
           cfg <- if (safe_file_exists(cfg_path)) tryCatch(read_config(cfg_path), error=function(e) list(known=list(), extra=list())) else list(known=list(), extra=list())
           gcfg <- gcfg_rv()
-          db_path <- cfg$known$snapshot_db %||% gcfg$snapshot_db %||% ""
+          db_path <- effective_db_path(config_dir(), gcfg, cfg$known$snapshot_db)
           last_runs <- read_snapshot_history(db_path, ds, n=5)
           ui_dataset_panel(ds, cfg, last_runs, gcfg)
         } else {
@@ -117,9 +117,14 @@ shinyApp(
         return(p(class="text-muted px-3", style="font-size:12px;", "No datasets configured."))
 
       gcfg <- gcfg_rv()
-      db_path <- gcfg$snapshot_db %||% ""
 
       items <- lapply(datasets, function(ds) {
+        # Honour a per-dataset snapshot_db override (matches the dataset panel)
+        ds_cfg <- tryCatch(
+          read_config(file.path(config_dir(), paste0(ds, ".yml")))$known,
+          error = function(e) NULL
+        )
+        db_path <- effective_db_path(config_dir(), gcfg, ds_cfg$snapshot_db)
         last_run <- read_snapshot_history(db_path, ds, n=1)
         status_text <- if (nrow(last_run) > 0) last_run$overall_status[1] else ""
         active <- isTRUE(rv$active_dataset == ds)

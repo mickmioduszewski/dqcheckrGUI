@@ -38,22 +38,24 @@ server_history <- function(input, output, session, rv, config_dir, gcfg_rv) {
       ))
     }
 
-    # Build direct /dq_reports/<file> links — avoids Shiny round-trip and popup blocking
+    # Build direct /dq_reports/<file> links — avoids Shiny round-trip and popup blocking.
+    # escape = FALSE below applies to ALL columns, so anything interpolated here
+    # must be escaped by hand — file_name in particular is supplier-controlled.
     filename <- make_report_filename(df$dataset_name, df$run_timestamp)
 
     display_df <- data.frame(
       ` ` = sprintf(
         '<input type="checkbox" class="hist-check" data-id="%d" data-ds="%s" onchange="window.__dqHC(this)"/>',
-        df$id, df$dataset_name),
-      Dataset = df$dataset_name,
+        df$id, html_escape(df$dataset_name, attribute = TRUE)),
+      Dataset = html_escape(df$dataset_name),
       Date    = utc_to_local_display(df$run_timestamp),
-      File    = df$file_name,
+      File    = html_escape(df$file_name),
       Status  = vapply(df$overall_status, status_badge_html, character(1)),
       Fails   = df$check_fail_count,
       Rows    = df$row_count,
       Report  = sprintf(
         '<a href="javascript:void(0)" onclick="window.open(\'/dq_reports/%s\',\'_blank\')">Open</a>',
-        filename),
+        url_encode_filename(filename)),
       stringsAsFactors = FALSE, check.names = FALSE
     )
     DT::datatable(display_df,

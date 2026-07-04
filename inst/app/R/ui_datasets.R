@@ -33,19 +33,24 @@ ui_dataset_panel <- function(dataset_name, config, last_runs, gcfg) {
     } else {
       local({
         filename <- make_report_filename(dataset_name, last_runs$run_timestamp)
+        # This data.frame is rendered with escape = FALSE (all columns), so
+        # every interpolated value is escaped by hand; file_name is
+        # supplier-controlled. ds_js is JS-string-escaped, then
+        # attribute-escaped for the raw onchange attribute it sits in.
         tagList(
           DT::datatable(
             data.frame(
               ` ` = sprintf(
                 '<input type="checkbox" class="drift-check" data-id="%d" data-ds="%s" onchange="window.__dqDC(\'%s\')"/>',
-                last_runs$id, dataset_name, ds_js),
+                last_runs$id, html_escape(dataset_name, attribute = TRUE),
+                html_escape(ds_js, attribute = TRUE)),
               Date   = utc_to_local_display(last_runs$run_timestamp),
-              File   = last_runs$file_name,
+              File   = html_escape(last_runs$file_name),
               Status = vapply(last_runs$overall_status, status_badge_html, character(1)),
               Fails  = last_runs$check_fail_count,
               Report = sprintf(
                 '<a href="javascript:void(0)" onclick="window.open(\'/dq_reports/%s\',\'_blank\')">Open</a>',
-                filename),
+                url_encode_filename(filename)),
               stringsAsFactors = FALSE, check.names = FALSE
             ),
             escape = FALSE, rownames = FALSE, selection = "none",

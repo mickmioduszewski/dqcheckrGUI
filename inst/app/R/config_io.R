@@ -75,6 +75,31 @@ write_global_config <- function(values, path) {
   yaml::write_yaml(values, path)
 }
 
+# Merge edited values over the existing on-disk global config so hand-added
+# keys survive a GUI save — parity with the dataset-config round-trip (spec
+# §20). Two levels: unknown top-level keys are preserved, and inside
+# default_rules unknown rule keys (e.g. max_row_count, max_file_size_mb,
+# iqr_fence_multiplier — consumed by dqcheckr but with no GUI widget) are
+# preserved while edited ones are replaced. Returns the merged list so the
+# caller can keep its in-session copy identical to what is now on disk.
+update_global_config <- function(values, path) {
+  existing <- if (file.exists(path))
+    tryCatch(yaml::read_yaml(path), error = function(e) list())
+  else list()
+  merged <- existing
+  for (key in names(values)) {
+    if (key == "default_rules" && is.list(existing$default_rules)) {
+      dr <- existing$default_rules
+      for (rk in names(values$default_rules)) dr[[rk]] <- values$default_rules[[rk]]
+      merged$default_rules <- dr
+    } else {
+      merged[[key]] <- values[[key]]
+    }
+  }
+  yaml::write_yaml(merged, path)
+  merged
+}
+
 build_config_list <- function(wiz) {
   cfg <- list()
   cfg$dataset_name <- wiz$dataset_name

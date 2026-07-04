@@ -1,3 +1,26 @@
+# dqcheckrGUI 0.2.1
+
+## Bug fixes
+
+* Sidebar status badges and the dataset panel's "Recent runs" table now
+  resolve a relative `snapshot_db` path (e.g. the `data/snapshots.sqlite`
+  written by the first-run scaffold) against the project root instead of the
+  installed app directory, where it never existed. Both views also now honour
+  a per-dataset `snapshot_db` override, matching the History panel.
+* Values interpolated into raw HTML in the History and dataset-panel tables
+  (delivered file names, dataset names, report URLs) are now HTML-escaped.
+  File names come from externally supplied deliveries, so a hostile file name
+  could previously inject markup into the analyst's browser.
+* Saving the Global Config no longer discards hand-added keys: unknown
+  top-level keys and `default_rules` entries with no GUI widget (e.g.
+  `max_row_count`, `max_file_size_mb`, `iqr_fence_multiplier`) are preserved,
+  matching the round-trip behaviour dataset configs already had.
+* Stepping through wizard step 6 without changing anything no longer writes a
+  spurious `min_row_count` override into the dataset config (an
+  integer-vs-double comparison artefact).
+* Folder-scan previews in the wizard no longer consider subdirectories when
+  picking the most recent file, and the folder file count excludes them.
+
 # dqcheckrGUI 0.2.0
 
 ## New features

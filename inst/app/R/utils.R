@@ -22,6 +22,48 @@ js_string_escape <- function(x) {
   gsub("'", "\\\\'", x)
 }
 
+# Minimal HTML escaper for text interpolated into raw HTML strings (DT columns
+# rendered with escape = FALSE, hand-built attribute values). file_name comes
+# from externally supplied deliveries, so it must never reach the DOM
+# unescaped; dataset names read back from disk filenames are also untrusted.
+html_escape <- function(x, attribute = FALSE) {
+  x <- gsub("&", "&amp;", x, fixed = TRUE)
+  x <- gsub("<", "&lt;",  x, fixed = TRUE)
+  x <- gsub(">", "&gt;",  x, fixed = TRUE)
+  if (attribute) {
+    x <- gsub('"', "&quot;", x, fixed = TRUE)
+    x <- gsub("'", "&#39;",  x, fixed = TRUE)
+  }
+  x
+}
+
+# Percent-encode a report filename for use inside a URL embedded in raw HTML.
+# Vectorised wrapper (utils::URLencode is scalar-only). reserved = TRUE also
+# encodes quotes and angle brackets, so the result is safe in both the JS
+# string and the surrounding HTML attribute.
+url_encode_filename <- function(x) {
+  vapply(x, utils::URLencode, character(1), reserved = TRUE, USE.NAMES = FALSE)
+}
+
+# List files (not subdirectories) in a folder. list.files() includes
+# directories in a non-recursive listing, so folder-scan previews sorted by
+# mtime could otherwise pick a directory as the "current file" (mirrors the
+# detect_files() fix in dqcheckr).
+list_files_only <- function(path) {
+  files <- list.files(path, full.names = TRUE)
+  files[!dir.exists(files)]
+}
+
+# Effective snapshot DB path for a dataset: per-dataset override, then the
+# global config, then the standard default — always resolved against the
+# deployment root. Raw relative paths (e.g. the "data/snapshots.sqlite" the
+# first-run scaffold writes) never resolve from the Shiny process's getwd(),
+# which shiny::runApp() has pointed at the installed app directory.
+effective_db_path <- function(config_dir, gcfg, ds_snapshot_db = NULL) {
+  resolve_infra_path(ds_snapshot_db %||% gcfg$snapshot_db, config_dir,
+                     default = "data/snapshots.sqlite", mustWork = FALSE)
+}
+
 .status_cfg <- function(status) {
   switch(as.character(status),
     PASS    = list(bg="#5cb85c", sym="✓", text="PASS"),

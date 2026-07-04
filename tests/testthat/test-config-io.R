@@ -360,3 +360,55 @@ test_that("renamed-header config round-trips through write -> read -> rebuild (G
   expect_equal(unlist(cfg2$col_names), c("PayeeName", "PayeeName_2", "Amount"))
   expect_equal(cfg2$csv_skip, 1L)   # NOT dropped on the second save
 })
+
+# ── update_global_config: unknown-key preservation (G-02) ────────────────────
+
+test_that("update_global_config preserves unknown top-level and rule keys", {
+  path <- tempfile(fileext = ".yml")
+  withr::defer(unlink(path))
+  yaml::write_yaml(list(
+    snapshot_db       = "data/old.sqlite",
+    report_output_dir = "reports/",
+    org_contact       = "data-team@example.org",     # unknown top-level key
+    default_rules = list(
+      max_missing_rate     = 0.05,
+      max_file_size_mb     = 500,                     # no GUI widget
+      iqr_fence_multiplier = 1.5                      # no GUI widget
+    )
+  ), path)
+
+  merged <- update_global_config(list(
+    snapshot_db       = "data/new.sqlite",
+    report_output_dir = "reports/",
+    default_rules     = list(max_missing_rate = 0.10)
+  ), path)
+
+  reread <- yaml::read_yaml(path)
+  for (cfg in list(merged, reread)) {
+    expect_equal(cfg$snapshot_db, "data/new.sqlite")            # edited key replaced
+    expect_equal(cfg$org_contact, "data-team@example.org")      # unknown key kept
+    expect_equal(cfg$default_rules$max_missing_rate, 0.10)      # edited rule replaced
+    expect_equal(cfg$default_rules$max_file_size_mb, 500)       # unknown rule kept
+    expect_equal(cfg$default_rules$iqr_fence_multiplier, 1.5)   # unknown rule kept
+  }
+})
+
+test_that("update_global_config creates the file when none exists", {
+  path <- tempfile(fileext = ".yml")
+  withr::defer(unlink(path))
+  merged <- update_global_config(list(
+    snapshot_db   = "data/snapshots.sqlite",
+    default_rules = list(max_missing_rate = 0.05)
+  ), path)
+  expect_true(file.exists(path))
+  expect_equal(merged$snapshot_db, "data/snapshots.sqlite")
+  expect_equal(yaml::read_yaml(path)$default_rules$max_missing_rate, 0.05)
+})
+
+test_that("update_global_config returns exactly what is on disk", {
+  path <- tempfile(fileext = ".yml")
+  withr::defer(unlink(path))
+  yaml::write_yaml(list(snapshot_db = "a", keep_me = TRUE), path)
+  merged <- update_global_config(list(snapshot_db = "b"), path)
+  expect_equal(merged, yaml::read_yaml(path))
+})

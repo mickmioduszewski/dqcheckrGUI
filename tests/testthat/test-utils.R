@@ -365,3 +365,104 @@ test_that("resolve_infra_path falls back to default when path is empty/NULL", {
                normalizePath(file.path(root, "data", "snapshots.sqlite"),
                              mustWork = FALSE))
 })
+
+# ── html_escape (G-06) ───────────────────────────────────────────────────────
+
+test_that("html_escape neutralises HTML in text content", {
+  expect_equal(html_escape("<img src=x onerror=alert(1)>.csv"),
+               "&lt;img src=x onerror=alert(1)&gt;.csv")
+  expect_equal(html_escape("a & b"), "a &amp; b")
+  expect_equal(html_escape("plain_name.csv"), "plain_name.csv")
+})
+
+test_that("html_escape escapes quotes only in attribute mode", {
+  expect_equal(html_escape('say "hi"'),                  'say "hi"')
+  expect_equal(html_escape('say "hi"', attribute = TRUE), "say &quot;hi&quot;")
+  expect_equal(html_escape("it's",     attribute = TRUE), "it&#39;s")
+})
+
+test_that("html_escape escapes ampersand first (no double-escaping)", {
+  expect_equal(html_escape("&lt;"), "&amp;lt;")
+})
+
+test_that("html_escape is vectorised", {
+  expect_equal(html_escape(c("<a>", "b")), c("&lt;a&gt;", "b"))
+})
+
+# ── url_encode_filename (G-06) ───────────────────────────────────────────────
+
+test_that("url_encode_filename percent-encodes unsafe characters", {
+  expect_equal(url_encode_filename("ds_20260704_101112.html"),
+               "ds_20260704_101112.html")
+  got <- url_encode_filename("a'b\"c<d>.html")
+  expect_false(grepl("[\"'<>]", got))
+})
+
+test_that("url_encode_filename is vectorised and unnamed", {
+  got <- url_encode_filename(c("a.html", "b c.html"))
+  expect_equal(got, c("a.html", "b%20c.html"))
+  expect_null(names(got))
+})
+
+# ── list_files_only (B-03 GUI copies) ────────────────────────────────────────
+
+test_that("list_files_only excludes subdirectories", {
+  d <- withr::local_tempdir()
+  writeLines("x", file.path(d, "data.csv"))
+  dir.create(file.path(d, "archive"))
+  got <- list_files_only(d)
+  expect_equal(basename(got), "data.csv")
+})
+
+test_that("list_files_only returns empty for empty or file-free folders", {
+  d <- withr::local_tempdir()
+  expect_length(list_files_only(d), 0)
+  dir.create(file.path(d, "only_a_dir"))
+  expect_length(list_files_only(d), 0)
+})
+
+# ── effective_db_path (G-01) ─────────────────────────────────────────────────
+
+test_that("effective_db_path resolves the relative scaffold default against the deployment root", {
+  root    <- withr::local_tempdir()
+  cfg_dir <- file.path(root, "config")
+  dir.create(cfg_dir)
+  gcfg <- list(snapshot_db = "data/snapshots.sqlite")
+  expect_equal(
+    effective_db_path(cfg_dir, gcfg),
+    normalizePath(file.path(root, "data", "snapshots.sqlite"), mustWork = FALSE)
+  )
+})
+
+test_that("effective_db_path prefers a per-dataset override over the global path", {
+  root    <- withr::local_tempdir()
+  cfg_dir <- file.path(root, "config")
+  dir.create(cfg_dir)
+  gcfg <- list(snapshot_db = "data/global.sqlite")
+  expect_equal(
+    effective_db_path(cfg_dir, gcfg, ds_snapshot_db = "data/override.sqlite"),
+    normalizePath(file.path(root, "data", "override.sqlite"), mustWork = FALSE)
+  )
+  # "" (read_config's absent marker) and NULL both fall through to global
+  expect_equal(
+    effective_db_path(cfg_dir, gcfg, ds_snapshot_db = ""),
+    normalizePath(file.path(root, "data", "global.sqlite"), mustWork = FALSE)
+  )
+})
+
+test_that("effective_db_path falls back to the standard default when nothing is configured", {
+  root    <- withr::local_tempdir()
+  cfg_dir <- file.path(root, "config")
+  dir.create(cfg_dir)
+  expect_equal(
+    effective_db_path(cfg_dir, list()),
+    normalizePath(file.path(root, "data", "snapshots.sqlite"), mustWork = FALSE)
+  )
+})
+
+test_that("effective_db_path leaves absolute paths unchanged", {
+  abs <- withr::local_tempfile(fileext = ".sqlite")
+  file.create(abs)
+  expect_equal(effective_db_path("/some/config", list(snapshot_db = abs)),
+               normalizePath(abs, mustWork = FALSE))
+})

@@ -45,7 +45,7 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
           wiz$current_step  <- 1L
           # Trigger file preview
           preview_path <- if (nchar(k$folder %||%"") > 0) {
-            files <- list.files(k$folder, full.names=TRUE)
+            files <- list_files_only(k$folder)
             if (length(files) > 0) files[order(file.mtime(files), decreasing=TRUE)[1]] else ""
           } else k$current_file %||% ""
           if (nchar(preview_path) > 0) {
@@ -243,7 +243,7 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
     path <- trimws(path)
     if (!safe_dir_exists(path)) return()
     wiz$folder <- path
-    files <- list.files(path, full.names=TRUE)
+    files <- list_files_only(path)
     if (length(files) > 0) {
       preview <- files[order(file.mtime(files), decreasing=TRUE)[1]]
       wiz$current_preview_path <- preview
@@ -337,7 +337,7 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
     path <- trimws(input$wiz_folder_display %||% "")
     if (nchar(path) == 0) return(NULL)
     if (safe_dir_exists(path)) {
-      n <- length(list.files(path))
+      n <- length(list_files_only(path))
       div(class="text-success mt-1", style="font-size:12px;",
           sprintf("✓ Folder found  (%d files)", n))
     } else {
@@ -373,7 +373,7 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
   output$wiz_folder_preview_info <- renderUI({
     path <- wiz$folder %||% ""
     if (nchar(path) == 0) return(NULL)
-    files <- list.files(path, full.names=TRUE)
+    files <- list_files_only(path)
     if (length(files) == 0) return(p(class="text-warning", "Folder is empty."))
     files_sorted <- files[order(file.mtime(files), decreasing=TRUE)]
     info <- lapply(seq_len(min(2, length(files_sorted))), function(i) {
@@ -736,20 +736,24 @@ collect_step_inputs <- function(input, wiz, gcfg) {
   # Rule overrides from step 6
   dr <- gcfg$default_rules %||% list()
   overrides <- list()
+  # Numeric-tolerant equality: numericInput returns a double, but YAML defaults
+  # may be integer (e.g. min_row_count: 0), and identical(0, 0L) is FALSE —
+  # which used to write a spurious override for every untouched field.
+  num_equal <- function(a, b) isTRUE(all.equal(as.numeric(a), as.numeric(b)))
   # Returns the input value if it is set and differs from the default, else NULL.
   # Assigning NULL to an absent list key is a no-op, so only changed keys persist
   # (a pure helper — avoids the `<<-` an accumulating closure would need).
   chk_num <- function(input_id, dflt) {
     v <- input[[input_id]]
-    if (!is.null(v) && !is.na(v) && !identical(v, dflt)) v else NULL
+    if (!is.null(v) && !is.na(v) && !num_equal(v, dflt)) v else NULL
   }
   overrides[["max_missing_rate"]]               <- chk_num("wiz_ro_max_missing",    dr$max_missing_rate %||% 0.05)
   overrides[["max_non_numeric_rate"]]           <- chk_num("wiz_ro_max_nonnumeric", dr$max_non_numeric_rate %||% 0.01)
   overrides[["min_row_count"]]                  <- chk_num("wiz_ro_min_rows",       dr$min_row_count %||% 0)
   v <- input$wiz_ro_max_rowchg;   dflt <- round((dr$max_row_count_change_pct %||% 0.10)*100,2)
-  if (!is.null(v) && !is.na(v) && !identical(v, dflt)) overrides$max_row_count_change_pct <- v/100
+  if (!is.null(v) && !is.na(v) && !num_equal(v, dflt)) overrides$max_row_count_change_pct <- v/100
   v <- input$wiz_ro_max_meanshift; dflt <- round((dr$max_numeric_mean_shift_pct %||% 0.20)*100,2)
-  if (!is.null(v) && !is.na(v) && !identical(v, dflt)) overrides$max_numeric_mean_shift_pct <- v/100
+  if (!is.null(v) && !is.na(v) && !num_equal(v, dflt)) overrides$max_numeric_mean_shift_pct <- v/100
   overrides[["max_missing_rate_change_pp"]]     <- chk_num("wiz_ro_max_misschg",   dr$max_missing_rate_change_pp %||% 2.0)
   overrides[["max_non_numeric_rate_change_pp"]] <- chk_num("wiz_ro_max_nonnumchg", dr$max_non_numeric_rate_change_pp %||% 1.0)
   overrides[["type_inference_threshold"]]       <- chk_num("wiz_ro_type_inf",      dr$type_inference_threshold %||% 0.90)

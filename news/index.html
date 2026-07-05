@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">dqcheckrGUI</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -32,6 +32,14 @@
       <small>Source: <a href="https://github.com/mickmioduszewski/dqcheckrGUI/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.2.2" id="dqcheckrgui-022">dqcheckrGUI 0.2.2<a class="anchor" aria-label="anchor" href="#dqcheckrgui-022"></a></h2>
+<div class="section level3">
+<h3 id="bug-fixes-0-2-2">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-0-2-2"></a></h3>
+<ul><li>The step-3 encoding sniffer no longer writes <code>encoding: ASCII</code> into dataset configs. <code><a href="https://readr.tidyverse.org/reference/encoding.html" class="external-link">readr::guess_encoding()</a></code>’s head sample confidently reports “ASCII” whenever the first accented byte sits beyond the sample — and that config value later hard-crashed the run’s R subprocess (“Invalid multibyte sequence” inside vroom/iconv) once a delivery contained non-ASCII bytes. Step 3 now scans the <em>entire</em> file: valid UTF-8 (which includes pure ASCII) is applied as <code>UTF-8</code> with certainty; only when the file is genuinely not UTF-8 does the statistical detector run — seeded with a chunk that actually contains the non-ASCII bytes — and its legacy-encoding candidates go through the usual confirm flow. New dependency: <code>stringi</code>.</li>
+<li>An <code>encoding: ASCII</code> in an existing config (written by hand or by an older GUI) is normalised to <code>UTF-8</code> when the config is read, so editing and re-saving a dataset upgrades it. ASCII is a strict subset of UTF-8, so the change is lossless.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.2.1" id="dqcheckrgui-021">dqcheckrGUI 0.2.1<a class="anchor" aria-label="anchor" href="#dqcheckrgui-021"></a></h2>
 <div class="section level3">

@@ -1,5 +1,27 @@
 # Changelog
 
+## dqcheckrGUI 0.2.2
+
+### Bug fixes
+
+- The step-3 encoding sniffer no longer writes `encoding: ASCII` into
+  dataset configs.
+  [`readr::guess_encoding()`](https://readr.tidyverse.org/reference/encoding.html)’s
+  head sample confidently reports “ASCII” whenever the first accented
+  byte sits beyond the sample — and that config value later hard-crashed
+  the run’s R subprocess (“Invalid multibyte sequence” inside
+  vroom/iconv) once a delivery contained non-ASCII bytes. Step 3 now
+  scans the *entire* file: valid UTF-8 (which includes pure ASCII) is
+  applied as `UTF-8` with certainty; only when the file is genuinely not
+  UTF-8 does the statistical detector run — seeded with a chunk that
+  actually contains the non-ASCII bytes — and its legacy-encoding
+  candidates go through the usual confirm flow. New dependency:
+  `stringi`.
+- An `encoding: ASCII` in an existing config (written by hand or by an
+  older GUI) is normalised to `UTF-8` when the config is read, so
+  editing and re-saving a dataset upgrades it. ASCII is a strict subset
+  of UTF-8, so the change is lossless.
+
 ## dqcheckrGUI 0.2.1
 
 ### Bug fixes

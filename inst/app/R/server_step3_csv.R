@@ -34,6 +34,55 @@ sniff_csv_file <- function(path, threshold = 0.90) {
   }, error = function(e) NULL)
 }
 
+# Full-file encoding sniff. "Is this valid UTF-8?" is decidable by scanning
+# every byte (pure ASCII passes: it is a UTF-8 subset), so that answer is
+# returned as certain and auto-applied. Which legacy encoding a non-UTF-8
+# file uses is only ever a statistical guess — those candidates carry
+# confidence labels and go through the normal sniff-conflict flow. A head
+# sample is never trusted for this: the file that motivated this scan had its
+# first accented byte ~4M rows in, and readr::guess_encoding()'s head sample
+# confidently reported "ASCII".
+sniff_file_encoding <- function(path) {
+  size <- suppressWarnings(file.size(path))
+  if (is.na(size) || size <= 0)
+    return(list(top = "UTF-8", certain = TRUE, candidates = c("UTF-8" = "UTF-8")))
+
+  raw <- readBin(path, what = "raw", n = size)
+  if (stringi::stri_enc_isutf8(raw))
+    return(list(top = "UTF-8", certain = TRUE,
+                candidates = c("UTF-8 (validated, whole file)" = "UTF-8")))
+
+  # Not valid UTF-8: give the charset detector the first chunk that actually
+  # contains non-ASCII bytes. Chunking is safe for this search because
+  # "contains a byte above 127" is a per-byte property.
+  window <- NULL
+  chunk  <- 1e6
+  start  <- 1
+  n      <- length(raw)
+  while (start <= n) {
+    end   <- min(start + chunk - 1, n)
+    piece <- raw[start:end]
+    if (!stringi::stri_enc_isascii(piece)) { window <- piece; break }
+    start <- end + 1
+  }
+  cand <- NULL
+  if (!is.null(window)) {
+    det <- tryCatch(stringi::stri_enc_detect(window)[[1]], error = function(e) NULL)
+    if (!is.null(det) && nrow(det) > 0) {
+      # The whole file failed UTF-8 validation; drop Unicode candidates the
+      # detector may still offer for a locally-valid window.
+      det <- det[!grepl("^UTF", det$Encoding, ignore.case = TRUE), , drop = FALSE]
+      if (nrow(det) > 0) {
+        k    <- seq_len(min(3, nrow(det)))
+        cand <- setNames(det$Encoding[k],
+                         sprintf("%s (%.0f%%)", det$Encoding[k], det$Confidence[k] * 100))
+      }
+    }
+  }
+  if (is.null(cand)) cand <- c("ISO-8859-1" = "ISO-8859-1")
+  list(top = cand[[1]], certain = FALSE, candidates = cand)
+}
+
 load_raw_preview <- function(session, path, wiz) {
   lines <- tryCatch(
     readLines(path, n=50, warn=FALSE, encoding="bytes"),
@@ -144,15 +193,13 @@ server_step3_csv <- function(input, output, session, wiz, gcfg_rv) {
       wiz$sniff_col_types <- sniff$col_types
     }
 
-    enc_raw <- tryCatch(readr::guess_encoding(path), error = function(e) NULL)
+    enc_sniff <- tryCatch(sniff_file_encoding(path), error = function(e) NULL)
     top_enc     <- NULL
     enc_choices <- NULL
-    if (!is.null(enc_raw) && nrow(enc_raw) > 0) {
-      top_enc <- enc_raw$encoding[1]
+    if (!is.null(enc_sniff)) {
+      top_enc <- enc_sniff$top
       enc_choices <- unique(c(
-        setNames(enc_raw$encoding[seq_len(min(3, nrow(enc_raw)))],
-                 sprintf("%s (%.0f%%)", enc_raw$encoding[seq_len(min(3, nrow(enc_raw)))],
-                         enc_raw$confidence[seq_len(min(3, nrow(enc_raw)))] * 100)),
+        enc_sniff$candidates,
         c("UTF-8" = "UTF-8", "ISO-8859-1" = "ISO-8859-1",
           "Windows-1252" = "Windows-1252", "UTF-16LE" = "UTF-16LE", "CP1250" = "CP1250")
       ))

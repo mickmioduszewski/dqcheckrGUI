@@ -1,0 +1,73 @@
+# Encoding normalisation + full-file sniff (the "encoding: ASCII" crash trap)
+
+.write_bytes <- function(txt, from = NULL) {
+  path <- tempfile(fileext = ".csv")
+  bytes <- if (is.null(from)) charToRaw(enc2utf8(txt))
+           else charToRaw(iconv(txt, from = "UTF-8", to = from))
+  writeBin(bytes, path)
+  path
+}
+
+test_that("normalise_encoding() maps ASCII aliases to UTF-8, case-insensitively", {
+  expect_equal(normalise_encoding("ASCII"), "UTF-8")
+  expect_equal(normalise_encoding("ascii"), "UTF-8")
+  expect_equal(normalise_encoding(" US-ASCII "), "UTF-8")
+  expect_equal(normalise_encoding("ANSI_X3.4-1968"), "UTF-8")
+})
+
+test_that("normalise_encoding() leaves real encodings and empties untouched", {
+  expect_equal(normalise_encoding("UTF-8"), "UTF-8")
+  expect_equal(normalise_encoding("Windows-1252"), "Windows-1252")
+  expect_equal(normalise_encoding("UTF-16LE"), "UTF-16LE")
+  expect_equal(normalise_encoding(""), "")
+  expect_null(normalise_encoding(NULL))
+})
+
+test_that("read_config() normalises a legacy 'encoding: ASCII' to UTF-8", {
+  path <- tempfile(fileext = ".yml")
+  writeLines(c(
+    "dataset_name: enc_ds",
+    "format: csv",
+    "encoding: ASCII",
+    "delimiter: ','"
+  ), path)
+  cfg <- read_config(path)
+  expect_equal(cfg$known$encoding, "UTF-8")
+  unlink(path)
+})
+
+test_that("sniff_file_encoding() is certain about valid UTF-8 (incl. pure ASCII)", {
+  utf8  <- .write_bytes("name,city\nZoë,München\n")
+  ascii <- .write_bytes("name,city\nMick,Sydney\n")
+  s1 <- sniff_file_encoding(utf8)
+  s2 <- sniff_file_encoding(ascii)
+  expect_true(s1$certain)
+  expect_equal(s1$top, "UTF-8")
+  expect_true(s2$certain)
+  expect_equal(s2$top, "UTF-8")
+  unlink(c(utf8, ascii))
+})
+
+test_that("sniff_file_encoding() flags a latin1 file as uncertain legacy", {
+  lat <- .write_bytes("name,city\nZoë,München\n", from = "ISO-8859-1")
+  s <- sniff_file_encoding(lat)
+  expect_false(s$certain)
+  expect_false(grepl("^UTF", s$top, ignore.case = TRUE))
+  unlink(lat)
+})
+
+test_that("sniff_file_encoding() sees past a large all-ASCII head", {
+  # The trap that motivated the full scan: guess_encoding()'s head sample says
+  # "ASCII" when the first accented byte sits megabytes into the file.
+  path <- tempfile(fileext = ".csv")
+  con  <- file(path, open = "wb")
+  writeBin(charToRaw("name,city\n"), con)
+  filler <- charToRaw(strrep("Mick,Sydney\n", 1000))
+  for (i in 1:200) writeBin(filler, con)  # ~2.4 MB of pure ASCII rows
+  writeBin(charToRaw(iconv("Zoë,München\n", "UTF-8", "ISO-8859-1")), con)
+  close(con)
+  s <- sniff_file_encoding(path)
+  expect_false(s$certain)
+  expect_false(identical(toupper(s$top), "ASCII"))
+  unlink(path)
+})

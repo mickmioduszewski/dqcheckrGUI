@@ -241,6 +241,16 @@ infer_col_type_simple <- function(x, threshold = 0.90) {
   "character"
 }
 
+# ASCII is a strict subset of UTF-8: declaring it can never parse differently
+# from UTF-8, but passed to readr's locale verbatim it hard-crashes the R
+# subprocess when a delivery contains a byte above 127 (vroom/iconv "Invalid
+# multibyte sequence"). Normalise it away wherever an encoding enters the GUI.
+normalise_encoding <- function(enc) {
+  if (toupper(trimws(enc %||% "")) %in%
+      c("ASCII", "US-ASCII", "ANSI_X3.4-1968", "ANSI_X3.4-1986",
+        "ISO646-US", "646")) "UTF-8" else enc
+}
+
 # Generate ruler string for N characters
 make_ruler_string <- function(max_chars = 120) {
   ruler <- rep(" ", max_chars)

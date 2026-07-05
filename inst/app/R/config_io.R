@@ -14,7 +14,8 @@ read_config <- function(path) {
     dataset_name       = raw$dataset_name %||% "",
     description        = raw$description %||% "",
     format             = raw$format %||% "csv",
-    encoding           = raw$encoding %||% "UTF-8",
+    # Normalised on read so an edit-then-save upgrades a legacy "ASCII" config.
+    encoding           = normalise_encoding(raw$encoding %||% "UTF-8"),
     delimiter          = raw$delimiter %||% ",",
     quote_char         = raw$quote_char %||% '"',
     # Header presence is the conjunction of two orthogonal facts. col_names may

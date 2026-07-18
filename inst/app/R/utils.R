@@ -214,7 +214,11 @@ suggest_col_names <- function(raw_names) {
   n <- length(raw_names)
   out    <- character(n)
   reason <- character(n)
-  taken  <- character(0)
+  # Preallocated (not grown with c() each iteration): filled by index, so the
+  # collision check `cand %in% taken` sees the assigned prefix plus trailing ""
+  # slots — harmless since `cand` is never empty. Avoids O(n^2) reallocation on
+  # very wide files (B-24).
+  taken  <- character(n)
   for (i in seq_len(n)) {
     raw  <- raw_names[i]
     base <- sanitize_r_name(raw)
@@ -234,7 +238,7 @@ suggest_col_names <- function(raw_names) {
     }
     out[i]    <- cand
     reason[i] <- why
-    taken     <- c(taken, cand)
+    taken[i]  <- cand
   }
   list(names = out, reason = reason)
 }

@@ -469,19 +469,20 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
     # open sequence, so inputs surviving from a previously opened dataset can
     # neither satisfy this guard nor be read positionally below (G-03).
     if (is.null(input[[wiz_input_id("s4_type", seq_no, 1)]])) return()
-    key_cols <- character(0)
-    exp_cols <- character(0)
+    n         <- length(cols)
+    is_key    <- logical(n)
+    is_exp    <- logical(n)
     overrides <- list()
     for (i in seq_along(cols)) {
       col <- cols[i]
       type_val <- input[[wiz_input_id("s4_type", seq_no, i)]] %||% "auto"
       if (type_val != "auto") overrides[[col]] <- type_val
-      if (isTRUE(input[[wiz_input_id("s4_key", seq_no, i)]])) key_cols <- c(key_cols, col)
-      if (isTRUE(input[[wiz_input_id("s4_exp", seq_no, i)]])) exp_cols <- c(exp_cols, col)
+      is_key[i] <- isTRUE(input[[wiz_input_id("s4_key", seq_no, i)]])
+      is_exp[i] <- isTRUE(input[[wiz_input_id("s4_exp", seq_no, i)]])
     }
     wiz$col_types_override <- overrides
-    wiz$key_columns <- key_cols
-    wiz$expected_columns <- exp_cols
+    wiz$key_columns <- cols[is_key]
+    wiz$expected_columns <- cols[is_exp]
   })
 
   observeEvent(input$step4_select_all_expected, {

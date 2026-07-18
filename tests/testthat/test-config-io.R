@@ -433,3 +433,37 @@ test_that("update_global_config aborts and preserves the file on a parse error (
   # The on-disk file is untouched -- no data was lost.
   expect_identical(readLines(path), before)
 })
+
+# ── write_yaml_atomic (B-07/B-08: crash-safe config writes) ───────────────────
+
+test_that("write_yaml_atomic round-trips and leaves no temp file (B-07/B-08)", {
+  dir  <- withr::local_tempdir()
+  path <- file.path(dir, "cfg.yml")
+  write_yaml_atomic(list(a = 1, b = list(c = 2)), path)
+  expect_equal(yaml::read_yaml(path), list(a = 1, b = list(c = 2)))
+  expect_equal(list.files(dir, pattern = "^dqcfg_"), character(0))   # temp cleaned up
+})
+
+test_that("write_yaml_atomic overwrites an existing file with new content (B-07/B-08)", {
+  dir  <- withr::local_tempdir()
+  path <- file.path(dir, "cfg.yml")
+  yaml::write_yaml(list(old = TRUE), path)
+  write_yaml_atomic(list(new = TRUE), path)
+  expect_equal(yaml::read_yaml(path), list(new = TRUE))
+})
+
+# ── read_global_config resilience (B-09: no crash on a malformed config) ──────
+
+test_that("read_global_config returns defaults for a missing file", {
+  cfg <- read_global_config(tempfile(fileext = ".yml"))
+  expect_equal(cfg$snapshot_db, "data/snapshots.sqlite")
+  expect_equal(cfg$default_rules$max_missing_rate, 0.05)
+})
+
+test_that("read_global_config falls back to defaults with a warning on a parse error (B-09)", {
+  path <- withr::local_tempfile(fileext = ".yml")
+  writeLines("default_rules: [unterminated", path)      # invalid YAML
+  expect_warning(cfg <- read_global_config(path), regexp = "could not be parsed")
+  expect_equal(cfg$snapshot_db, "data/snapshots.sqlite")   # defaults, not a crash
+  expect_true(is.list(cfg$default_rules))
+})

@@ -49,27 +49,37 @@ read_config <- function(path) {
 }
 
 read_global_config <- function(path) {
-  if (!file.exists(path)) {
-    return(list(
-      snapshot_db       = "data/snapshots.sqlite",
-      report_output_dir = "reports/",
-      default_rules = list(
-        type_inference_threshold      = 0.90,
-        max_missing_rate              = 0.05,
-        max_non_numeric_rate          = 0.01,
-        min_row_count                 = 0,
-        max_row_count_change_pct      = 0.10,
-        max_numeric_mean_shift_pct    = 0.20,
-        max_missing_rate_change_pp    = 2.0,
-        max_non_numeric_rate_change_pp= 1.0,
-        flag_new_columns              = TRUE,
-        flag_dropped_columns          = TRUE,
-        flag_type_changes             = TRUE,
-        flag_column_order_change      = TRUE
-      )
-    ))
-  }
-  yaml::read_yaml(path)
+  defaults <- list(
+    snapshot_db       = "data/snapshots.sqlite",
+    report_output_dir = "reports/",
+    default_rules = list(
+      type_inference_threshold      = 0.90,
+      max_missing_rate              = 0.05,
+      max_non_numeric_rate          = 0.01,
+      min_row_count                 = 0,
+      max_row_count_change_pct      = 0.10,
+      max_numeric_mean_shift_pct    = 0.20,
+      max_missing_rate_change_pp    = 2.0,
+      max_non_numeric_rate_change_pp= 1.0,
+      flag_new_columns              = TRUE,
+      flag_dropped_columns          = TRUE,
+      flag_type_changes             = TRUE,
+      flag_column_order_change      = TRUE
+    )
+  )
+  if (!file.exists(path)) return(defaults)
+  # A malformed global config must not crash the session at startup (this is
+  # called unguarded when seeding the app's reactive config). Fall back to the
+  # defaults with a warning; the save path (update_global_config) still refuses
+  # to overwrite a config it could not read, so the corrupt file is preserved. B-09.
+  tryCatch(
+    yaml::read_yaml(path),
+    error = function(e) {
+      warning(sprintf(
+        "Global config at '%s' could not be parsed; using defaults for this session (%s)",
+        path, conditionMessage(e)), call. = FALSE)
+      defaults
+    })
 }
 
 # Merge edited values over the existing on-disk global config so hand-added
@@ -102,7 +112,7 @@ update_global_config <- function(values, path) {
       merged[[key]] <- values[[key]]
     }
   }
-  yaml::write_yaml(merged, path)
+  write_yaml_atomic(merged, path)
   merged
 }
 
@@ -189,13 +199,33 @@ build_config_list <- function(wiz) {
   cfg
 }
 
+# Write a list to `path` as YAML atomically: serialise to a temp file in the
+# same directory, then rename it over the destination. yaml::write_yaml() opens
+# the destination truncate-then-write, so an interrupted write (process killed,
+# power loss) leaves the live config truncated or empty -- and these files are
+# the sole config for a dataset (or the global config every dataset depends on),
+# deployed to network/OneDrive shares. Same-directory temp keeps the rename on
+# one filesystem so it is atomic; a copy+unlink fallback covers the rare case
+# where rename is refused. B-07/B-08.
+write_yaml_atomic <- function(x, path) {
+  dir <- dirname(path)
+  tmp <- tempfile("dqcfg_", tmpdir = dir, fileext = ".tmp")
+  on.exit(if (file.exists(tmp)) unlink(tmp), add = TRUE)
+  yaml::write_yaml(x, tmp)
+  if (!file.rename(tmp, path)) {
+    if (!file.copy(tmp, path, overwrite = TRUE))
+      stop(sprintf("Could not write config to '%s'.", path), call. = FALSE)
+  }
+  invisible(path)
+}
+
 write_config <- function(wiz, extra, path) {
   cfg <- build_config_list(wiz)
   # Merge extra keys (unknown keys from original file)
   for (key in names(extra)) {
     if (!key %in% names(cfg)) cfg[[key]] <- extra[[key]]
   }
-  yaml::write_yaml(cfg, path)
+  write_yaml_atomic(cfg, path)
 }
 
 yaml_preview_text <- function(wiz, extra) {

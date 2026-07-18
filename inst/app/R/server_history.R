@@ -94,6 +94,16 @@ server_history <- function(input, output, session, rv, config_dir, gcfg_rv) {
 
   # Shared drift-launch helper
   launch_drift <- function(ds_name, id1, id2) {
+    # rv_drift$proc is a single slot shared by both Compare buttons (History
+    # panel and dataset panel). A second launch while one is in flight would
+    # overwrite the handle, orphaning the first callr process so its completion
+    # is never observed. Refuse the overlap instead (B-13/B-16); the poll
+    # observer nulls the slot on completion, re-enabling Compare.
+    if (!is.null(rv_drift$proc) && rv_drift$proc$is_alive()) {
+      showNotification("A drift comparison is already running — please wait for it to finish.",
+                       type = "warning", duration = 5)
+      return(invisible(NULL))
+    }
     cd         <- config_dir()
     db_path    <- resolve_infra_path(gcfg_rv()$snapshot_db, cd,
                                      default = "data/snapshots.sqlite", mustWork = FALSE)

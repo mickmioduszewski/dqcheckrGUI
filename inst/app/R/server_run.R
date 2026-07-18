@@ -119,6 +119,39 @@ server_run <- function(input, output, session, rv, config_dir, gcfg_rv) {
     )
   })
 
+  # Collect a finished run's result and move out of the "running" state.
+  # Extracted so the Stop handler can call it too: a run can finish inside the
+  # 200ms poll window, and if the user clicks Stop in that gap we must report
+  # the real (already-on-disk) PASS/FAIL result rather than "stopped" (B-12).
+  finish_completed_run <- function() {
+    proc <- rv_run$r_process
+    # On failure, surface the *actual* cause — either the condition message
+    # from the background process, or (more often informative) the last
+    # non-blank line of its log — rather than a generic "check the log"
+    # message. Mirrors the pattern already used for drift failures in
+    # server_history.R's poll observer.
+    result <- tryCatch(proc$get_result(), error = function(e) {
+      last_line <- tryCatch({
+        lp <- rv_run$log_path
+        if (!is.null(lp) && file.exists(lp)) {
+          lines <- readLines(lp, warn = FALSE)
+          lines <- lines[nchar(trimws(lines)) > 0]
+          if (length(lines) > 0) tail(lines, 1) else ""
+        } else ""
+      }, error = function(e2) "")
+      msg <- if (nchar(last_line) > 0) last_line else conditionMessage(e)
+      rv_run$error_msg <- paste("Run failed:", msg)
+      NULL
+    })
+    rv_run$status <- if (!is.null(result)) as.character(result$status) else "error"
+    if (!is.null(result)) rv_run$report_path <- result$report_path
+    rv$history_refresh <- Sys.time()
+    # Re-register report resource paths: the reports directory may only now
+    # exist (dqcheckr creates it on first run), and per-dataset dirs may
+    # have received their first report.
+    register_all_report_paths(config_dir(), gcfg_rv())
+  }
+
   # 200ms polling observer
   observe({
     req(rv_run$status == "running")
@@ -136,33 +169,7 @@ server_run <- function(input, output, session, rv, config_dir, gcfg_rv) {
     }
 
     proc <- rv_run$r_process
-    if (!is.null(proc) && !proc$is_alive()) {
-      # On failure, surface the *actual* cause — either the condition message
-      # from the background process, or (more often informative) the last
-      # non-blank line of its log — rather than a generic "check the log"
-      # message. Mirrors the pattern already used for drift failures in
-      # server_history.R's poll observer.
-      result <- tryCatch(proc$get_result(), error = function(e) {
-        last_line <- tryCatch({
-          lp <- rv_run$log_path
-          if (!is.null(lp) && file.exists(lp)) {
-            lines <- readLines(lp, warn = FALSE)
-            lines <- lines[nchar(trimws(lines)) > 0]
-            if (length(lines) > 0) tail(lines, 1) else ""
-          } else ""
-        }, error = function(e2) "")
-        msg <- if (nchar(last_line) > 0) last_line else conditionMessage(e)
-        rv_run$error_msg <- paste("Run failed:", msg)
-        NULL
-      })
-      rv_run$status <- if (!is.null(result)) as.character(result$status) else "error"
-      if (!is.null(result)) rv_run$report_path <- result$report_path
-      rv$history_refresh <- Sys.time()
-      # Re-register report resource paths: the reports directory may only now
-      # exist (dqcheckr creates it on first run), and per-dataset dirs may
-      # have received their first report.
-      register_all_report_paths(config_dir(), gcfg_rv())
-    }
+    if (!is.null(proc) && !proc$is_alive()) finish_completed_run()
   })
 
   # Stop button
@@ -184,9 +191,15 @@ server_run <- function(input, output, session, rv, config_dir, gcfg_rv) {
 
   observeEvent(input$run_stop_confirm, {
     removeModal()
-    if (!is.null(rv_run$r_process)) {
-      tryCatch(rv_run$r_process$kill(), error=function(e) NULL)
+    proc <- rv_run$r_process
+    # The run may have finished between the poll ticks while the confirm dialog
+    # was open. Its result is already written to disk — collect it rather than
+    # discarding a completed run's PASS/FAIL and reporting "stopped" (B-12).
+    if (!is.null(proc) && !proc$is_alive()) {
+      finish_completed_run()
+      return()
     }
+    if (!is.null(proc)) tryCatch(proc$kill(), error=function(e) NULL)
     rv_run$status <- "stopped"
     rv_run$log_lines <- c(rv_run$log_lines, "\n[Run stopped by user]")
   })

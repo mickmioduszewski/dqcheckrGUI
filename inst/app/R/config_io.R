@@ -80,8 +80,17 @@ read_global_config <- function(path) {
 # preserved while edited ones are replaced. Returns the merged list so the
 # caller can keep its in-session copy identical to what is now on disk.
 update_global_config <- function(values, path) {
+  # A parse error must NOT be swallowed into list(): doing so would drop every
+  # existing key the GUI form did not submit (the no-widget default_rules keys,
+  # any hand-added keys) and then overwrite the file with the trimmed content --
+  # silently wiping the config while reporting success. Abort instead so the
+  # caller surfaces "Save failed" and the on-disk file is left untouched (B-05).
   existing <- if (file.exists(path))
-    tryCatch(yaml::read_yaml(path), error = function(e) list())
+    tryCatch(
+      yaml::read_yaml(path),
+      error = function(e) stop(sprintf(
+        "the existing global config at '%s' could not be read, so it was not overwritten (%s)",
+        path, conditionMessage(e)), call. = FALSE))
   else list()
   merged <- existing
   for (key in names(values)) {

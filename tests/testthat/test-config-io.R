@@ -412,3 +412,24 @@ test_that("update_global_config returns exactly what is on disk", {
   merged <- update_global_config(list(snapshot_db = "b"), path)
   expect_equal(merged, yaml::read_yaml(path))
 })
+
+test_that("update_global_config aborts and preserves the file on a parse error (B-05)", {
+  # An existing global config that fails to parse (hand-edited, or a concurrent
+  # write on a network share) must NOT be silently replaced with only the
+  # just-submitted keys -- that wipes every no-widget key while reporting success.
+  path <- tempfile(fileext = ".yml")
+  withr::defer(unlink(path))
+  writeLines(c("default_rules:",
+               "  max_missing_rate: 0.05",
+               "  max_file_size_mb: 500",
+               "org_contact: [unterminated flow"),   # invalid YAML
+             path)
+  before <- readLines(path)
+
+  # Aborts (so the caller shows "Save failed") instead of silently overwriting.
+  expect_error(
+    update_global_config(list(snapshot_db = "data/new.sqlite"), path),
+    regexp = "could not be read")
+  # The on-disk file is untouched -- no data was lost.
+  expect_identical(readLines(path), before)
+})

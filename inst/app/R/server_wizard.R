@@ -601,10 +601,15 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
   # wizard session (old seq) writes to an output nothing displays.
   observeEvent(input$s5_test_regex_click, {
     click  <- input$s5_test_regex_click
-    ii     <- as.integer(click$i)
-    seq_no <- as.integer(click$seq)
+    # Client-settable payload: a missing/non-scalar/non-numeric i or seq would
+    # make as.integer() return integer(0) and turn the guard below into a
+    # length-zero `if`, erroring the observer (B-17). Require well-formed
+    # scalars first.
+    req(is.list(click), length(click$i) == 1, length(click$seq) == 1)
+    ii     <- suppressWarnings(as.integer(click$i))
+    seq_no <- suppressWarnings(as.integer(click$seq))
     cols   <- wiz$col_names
-    if (is.na(ii) || ii < 1 || ii > length(cols)) return()
+    if (is.na(ii) || is.na(seq_no) || ii < 1 || ii > length(cols)) return()
     col     <- cols[ii]
     pattern <- input[[wiz_input_id("s5_pattern", seq_no, ii)]] %||% ""
     if (nchar(pattern) == 0) return()

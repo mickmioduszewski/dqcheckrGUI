@@ -168,6 +168,10 @@ shinyApp(
     # ── Dataset panel actions (edit, run, history, compare) ─────────
     observeEvent(input$ds_action, {
       req(is.list(input$ds_action))
+      # ds_action is settable from client JS, so the payload is untrusted: a
+      # missing `action` would make `action == "edit"` a length-zero comparison
+      # and error the observer. Require it before any comparison (B-15).
+      req(!is.null(input$ds_action$action))
       action <- input$ds_action$action
       ds     <- input$ds_action$ds
       if (action == "edit") {

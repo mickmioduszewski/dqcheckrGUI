@@ -41,12 +41,6 @@ server_history <- function(input, output, session, rv, config_dir, gcfg_rv) {
     # Build direct report links — avoids Shiny round-trip and popup blocking.
     # escape = FALSE below applies to ALL columns, so anything interpolated here
     # must be escaped by hand — file_name in particular is supplier-controlled.
-    # Prefer the filename recorded by dqcheckr >= 0.2.3; reconstruct from the
-    # run timestamp only for older rows. Rows whose render failed get no link.
-    filename <- ifelse(!is.na(df$report_file), df$report_file,
-                       make_report_filename(df$dataset_name, df$run_timestamp))
-    failed   <- !is.na(df$render_status) & df$render_status == "failed"
-
     # Per-dataset URL prefix: datasets with a report_output_dir override are
     # served under their own resource path (see report_url_prefix()).
     cd   <- config_dir()
@@ -68,11 +62,11 @@ server_history <- function(input, output, session, rv, config_dir, gcfg_rv) {
       Status  = vapply(df$overall_status, status_badge_html, character(1)),
       Fails   = df$check_fail_count,
       Rows    = df$row_count,
-      Report  = ifelse(failed,
-        '<span class="text-muted fst-italic">render failed</span>',
-        sprintf(
-          '<a href="javascript:void(0)" onclick="window.open(\'/%s/%s\',\'_blank\')">Open</a>',
-          row_prefix, url_encode_filename(filename))),
+      # Same contract as the dataset panel: link only for a report that exists;
+      # a 'pending' render shows "rendering…" (no dead link). See
+      # report_link_cell() in utils.R. row_prefix/dataset_name are per-row here.
+      Report  = report_link_cell(df$report_file, df$render_status,
+                                 df$run_timestamp, df$dataset_name, row_prefix),
       stringsAsFactors = FALSE, check.names = FALSE
     )
     DT::datatable(display_df,

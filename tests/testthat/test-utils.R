@@ -641,3 +641,17 @@ test_that("report_link_cell is vectorised across a mix of rows", {
   expect_match(cells[2], "rendering")
   expect_match(cells[3], "render failed")
 })
+
+test_that("report_link_cell handles per-row prefixes and datasets (history panel, B-02)", {
+  # The history table spans multiple datasets, each with its own URL prefix.
+  cells <- report_link_cell(
+    report_file   = c("a_1.html",   NA,        NA),
+    render_status = c("success",    "pending", "failed"),
+    run_timestamp = rep("2026-07-18 01:02:03", 3),
+    dataset_name  = c("sales",      "costs",   "hr"),
+    report_prefix = c("dq_reports", "costs_rp", "hr_rp"))
+  expect_match(cells[1], "/dq_reports/a_1\\.html")
+  expect_match(cells[2], "rendering")           # pending -> no dead link
+  expect_false(grepl("Open", cells[2]))
+  expect_match(cells[3], "render failed")
+})

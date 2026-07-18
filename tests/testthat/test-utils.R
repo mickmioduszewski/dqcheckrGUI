@@ -569,3 +569,75 @@ test_that("read_snapshot_history handles zero-row results from old-schema DBs cl
   expect_equal(nrow(df), 0)
   expect_true(all(c("render_status", "report_file") %in% names(df)))
 })
+
+# ── drift_report_url (B-01 alignment) ────────────────────────────────────────
+# dqcheckr >= 0.2.5 returns the drift report path directly; the GUI links to it
+# instead of re-deriving the filename with a slug regex (which broke when the
+# drift filename gained its snapshot ids).
+
+test_that("drift_report_url builds the /dq_reports/ URL from report_path", {
+  f <- withr::local_tempfile(fileext = ".html")
+  writeLines("<html/>", f)
+  # The new id-suffixed filename shape the old regex could not match:
+  target <- file.path(dirname(f), "drift_sales_20260718_072345_1_2.html")
+  file.rename(f, target)
+  url <- drift_report_url(list(report_path = target))
+  expect_equal(url, "/dq_reports/drift_sales_20260718_072345_1_2.html")
+})
+
+test_that("drift_report_url returns NULL when no report was written", {
+  # report_path is NULL when report=FALSE / Quarto absent / render failed.
+  expect_null(drift_report_url(list(report_path = NULL)))
+  expect_null(drift_report_url(list()))                       # element absent
+})
+
+test_that("drift_report_url returns NULL when the file is not on disk", {
+  expect_null(drift_report_url(list(report_path = "/no/such/drift_x_1_2.html")))
+})
+
+# ── report_link_cell (B-02: pending render_status alignment) ──────────────────
+
+test_that("report_link_cell links to the stored report_file when present", {
+  cell <- report_link_cell("sales_20260718_010203_7.html", "success",
+                           "2026-07-18 01:02:03", "sales", "dq_reports")
+  expect_match(cell, "sales_20260718_010203_7\\.html")
+  expect_match(cell, "Open")
+})
+
+test_that("report_link_cell shows 'rendering…' for a pending row, no link (B-02)", {
+  cell <- report_link_cell(NA_character_, "pending",
+                           "2026-07-18 01:02:03", "sales", "dq_reports")
+  expect_match(cell, "rendering")
+  expect_false(grepl("Open", cell))
+  expect_false(grepl("window.open", cell))     # no dead link to a not-yet-written file
+})
+
+test_that("report_link_cell shows 'render failed' for a failed row", {
+  cell <- report_link_cell(NA_character_, "failed",
+                           "2026-07-18 01:02:03", "sales", "dq_reports")
+  expect_match(cell, "render failed")
+  expect_false(grepl("Open", cell))
+})
+
+test_that("report_link_cell reconstructs the legacy slug only for a pre-0.2.3 success/NA row", {
+  # render_status success but no file = genuine pre-0.2.3 row -> reconstruct.
+  legacy <- report_link_cell(NA_character_, "success",
+                             "2026-07-18 01:02:03", "sales", "dq_reports")
+  expect_match(legacy, "sales_20260718_010203\\.html")   # id-less legacy name
+  expect_match(legacy, "Open")
+  # NA render_status (very old DB, pre render tracking) also reconstructs.
+  na_row <- report_link_cell(NA_character_, NA_character_,
+                             "2026-07-18 01:02:03", "sales", "dq_reports")
+  expect_match(na_row, "Open")
+})
+
+test_that("report_link_cell is vectorised across a mix of rows", {
+  cells <- report_link_cell(
+    c("a_1.html", NA,        NA),
+    c("success",  "pending", "failed"),
+    rep("2026-07-18 01:02:03", 3), "sales", "dq_reports")
+  expect_length(cells, 3)
+  expect_match(cells[1], "a_1\\.html")
+  expect_match(cells[2], "rendering")
+  expect_match(cells[3], "render failed")
+})

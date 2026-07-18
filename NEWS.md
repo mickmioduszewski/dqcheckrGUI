@@ -1,3 +1,23 @@
+# dqcheckrGUI (development version)
+
+## Bug fixes
+
+* The drift-comparison report link now works again. The GUI located the rendered
+  drift report by reconstructing its filename with a fixed pattern, which stopped
+  matching once dqcheckr's drift filenames gained a snapshot-id suffix — so every
+  drift comparison reported "report not found" even though it rendered. The GUI
+  now uses the report path `compare_snapshots()` returns directly (requires
+  dqcheckr >= 0.2.5 behaviour), removing the fragile filename contract.
+
+* Report links in the dataset panel now account for a report that is still
+  rendering. A snapshot whose `render_status` is `"pending"` (dqcheckr 0.2.5+)
+  no longer gets a clickable "Open" link to a file that is not yet on disk; it
+  shows "rendering…" until the report is written. A filename is only
+  reconstructed for a genuine pre-0.2.3 row, not whenever one is absent.
+
+* The `dqcheckr` dependency floor was raised to the version whose behaviour the
+  report and drift link builders rely on.
+
 # dqcheckrGUI 0.2.2
 
 ## Bug fixes

@@ -1,7 +1,7 @@
 Package: dqcheckrGUI
 Type: Package
 Title: Point-and-Click GUI Client for 'dqcheckr'
-Version: 0.2.2
+Version: 0.2.2.9000
 Date: 2026-07-05
 Authors@R: person("Mick", "Mioduszewski",
                   email = "mick@mioduszewski.net",
@@ -19,7 +19,7 @@ Language: en-GB
 Depends:
     R (>= 4.2)
 Imports:
-    dqcheckr (>= 0.2.2),
+    dqcheckr (>= 0.2.4.9000),
     shiny,
     bslib,
     shinyvalidate,

@@ -157,16 +157,12 @@ server_history <- function(input, output, session, rv, config_dir, gcfg_rv) {
     rv_drift$proc <- NULL
     if (is.null(result)) return()
 
-    ds_name     <- rv_drift$ds_name
-    # Anchor to the exact "drift_<dataset>_<YYYYMMDD>_<HHMMSS>.html" slug shape
-    # (see make_report_filename(), utils.R) rather than a loose ".*" — a bare
-    # "^drift_<ds_name>_.*\\.html$" would also match e.g. "RBB_bonds"'s report
-    # when ds_name is "RBB", since "bonds_<timestamp>.html" satisfies ".*\\.html$".
-    drift_files <- list.files(rv_drift$report_dir,
-                              pattern    = sprintf("^drift_%s_[0-9]{8}_[0-9]{6}\\.html$", ds_name),
-                              full.names = FALSE)
-    if (length(drift_files) > 0) {
-      url <- paste0("/dq_reports/", drift_files[length(drift_files)])
+    # dqcheckr (>= 0.2.5) returns the rendered report's path directly; link to
+    # it rather than re-deriving the filename with a slug regex (which broke when
+    # the drift filename gained its snapshot ids). NULL means no report was
+    # written (e.g. Quarto unavailable) -- the drift still ran.
+    url <- drift_report_url(result)
+    if (!is.null(url)) {
       showModal(modalDialog(
         title  = "Drift comparison complete",
         tags$a(href = url, target = "_blank", class = "btn btn-primary",
@@ -176,7 +172,7 @@ server_history <- function(input, output, session, rv, config_dir, gcfg_rv) {
       ))
     } else {
       showNotification(
-        "Drift comparison complete. Report not found in reports directory.",
+        "Drift comparison complete, but no HTML report was written (Quarto may be unavailable).",
         type = "warning"
       )
     }

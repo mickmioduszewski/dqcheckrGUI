@@ -33,13 +33,12 @@ ui_dataset_panel <- function(dataset_name, config, last_runs, gcfg,
       p(class="text-muted fst-italic", "No runs recorded yet.")
     } else {
       local({
-        # Prefer the filename recorded by dqcheckr >= 0.2.3; reconstruct from
-        # the run timestamp only for older rows. Failed renders get no link.
-        filename <- ifelse(!is.na(last_runs$report_file),
-                           last_runs$report_file,
-                           make_report_filename(dataset_name, last_runs$run_timestamp))
-        failed   <- !is.na(last_runs$render_status) &
-                    last_runs$render_status == "failed"
+        # Report cell per run: link only for a report that exists, and treat a
+        # dqcheckr 0.2.5 'pending' render as still-in-progress (no dead link).
+        # See report_link_cell() in utils.R.
+        report_cells <- report_link_cell(
+          last_runs$report_file, last_runs$render_status,
+          last_runs$run_timestamp, dataset_name, report_prefix)
         # This data.frame is rendered with escape = FALSE (all columns), so
         # every interpolated value is escaped by hand; file_name is
         # supplier-controlled. ds_js is JS-string-escaped, then
@@ -55,11 +54,7 @@ ui_dataset_panel <- function(dataset_name, config, last_runs, gcfg,
               File   = html_escape(last_runs$file_name),
               Status = vapply(last_runs$overall_status, status_badge_html, character(1)),
               Fails  = last_runs$check_fail_count,
-              Report = ifelse(failed,
-                '<span class="text-muted fst-italic">render failed</span>',
-                sprintf(
-                  '<a href="javascript:void(0)" onclick="window.open(\'/%s/%s\',\'_blank\')">Open</a>',
-                  report_prefix, url_encode_filename(filename))),
+              Report = report_cells,
               stringsAsFactors = FALSE, check.names = FALSE
             ),
             escape = FALSE, rownames = FALSE, selection = "none",

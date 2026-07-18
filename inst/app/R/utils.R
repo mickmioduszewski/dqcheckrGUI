@@ -8,6 +8,48 @@ make_report_filename <- function(dataset_name, run_timestamp) {
   paste0(dataset_name, "_", ts_slug, ".html")
 }
 
+# Build the /dq_reports/ URL for a rendered drift report from the value
+# compare_snapshots() returns. dqcheckr (>= 0.2.5) exposes the report path
+# directly as result$report_path, so we link to it rather than re-deriving the
+# filename from a slug regex -- that reconstruction broke when the drift
+# filename gained its snapshot ids. Returns NULL when no report was written
+# (report_path NULL, or the file is not on disk), so the caller can show a
+# "no report" message instead of a dead link.
+drift_report_url <- function(drift_result) {
+  rp <- drift_result$report_path
+  if (is.null(rp) || length(rp) != 1 || is.na(rp) || !nzchar(rp) ||
+      !file.exists(rp))
+    return(NULL)
+  paste0("/dq_reports/", basename(rp))
+}
+
+# The Report-column cell (HTML) for the dataset panel's recent-runs table.
+# Vectorised over runs. Aligns with dqcheckr's render_status contract so a link
+# is only shown for a report that actually exists on disk:
+#   report_file present               -> link to it (0.2.3+ recorded filename)
+#   no file, render_status success/NA -> reconstruct the legacy slug and link
+#                                        (genuine pre-0.2.3 row)
+#   no file, render_status 'pending'  -> "rendering…" (0.2.5: report not written
+#                                        yet; reconstructing would 404, and the
+#                                        real name carries a snapshot id we omit)
+#   no file, render_status 'failed'   -> "render failed"
+report_link_cell <- function(report_file, render_status, run_timestamp,
+                             dataset_name, report_prefix) {
+  have_file <- !is.na(report_file)
+  legacy_ok <- !have_file & (is.na(render_status) | render_status == "success")
+  linkable  <- have_file | legacy_ok
+  pending   <- !is.na(render_status) & render_status == "pending"
+  filename  <- ifelse(have_file, report_file,
+                      make_report_filename(dataset_name, run_timestamp))
+  ifelse(linkable,
+    sprintf(
+      '<a href="javascript:void(0)" onclick="window.open(\'/%s/%s\',\'_blank\')">Open</a>',
+      report_prefix, url_encode_filename(filename)),
+    ifelse(pending,
+      '<span class="text-muted fst-italic">rendering…</span>',
+      '<span class="text-muted fst-italic">render failed</span>'))
+}
+
 # Escape a string for safe embedding inside a single-quoted JavaScript string
 # literal — e.g. the dataset name interpolated into
 # onclick="Shiny.setInputValue('ds_action', {ds:'<name>', ...})". Backslashes

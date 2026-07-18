@@ -361,6 +361,50 @@ test_that("renamed-header config round-trips through write -> read -> rebuild (G
   expect_equal(cfg2$csv_skip, 1L)   # NOT dropped on the second save
 })
 
+test_that("renamed-header keys survive an edit that never re-probes step 3 (B-06)", {
+  # open_wizard() resets raw_header_names to empty on edit. If the user saves
+  # without visiting step 3 again, build_config_list() cannot recompute the
+  # rename — but it must preserve the loaded col_names + csv_skip rather than
+  # silently reverting the file to its unwanted original header.
+  k <- read_config(local({
+    p <- tempfile(fileext = ".yml")
+    yaml::write_yaml(list(
+      dataset_name = "refunds", format = "csv", encoding = "UTF-8",
+      delimiter = ",", current_file = "/data/refunds.csv",
+      col_names = list("PayeeName", "PayeeName_2", "Amount"), csv_skip = 1L), p)
+    p
+  }))$known
+  expect_true(k$has_header)
+
+  wiz <- make_wiz(
+    dataset_name     = "refunds",
+    file_mode        = "explicit", current_file = "/data/refunds.csv",
+    has_header       = k$has_header,
+    raw_header_names = character(0),   # never re-probed this edit session
+    col_names        = k$col_names,
+    csv_skip         = k$csv_skip
+  )
+  cfg <- build_config_list(wiz)
+  expect_equal(unlist(cfg$col_names), c("PayeeName", "PayeeName_2", "Amount"))
+  expect_equal(cfg$csv_skip, 1L)
+})
+
+test_that("clean-header edit without re-probe stays clean (B-06 no false positive)", {
+  # A clean-header config loads with col_names empty + csv_skip 0; a no-re-probe
+  # save must still emit neither key (the carry-forward only fires for a real
+  # renamed-header config).
+  wiz <- make_wiz(
+    file_mode        = "explicit", current_file = "/data/clean.csv",
+    has_header       = TRUE,
+    raw_header_names = character(0),
+    col_names        = character(0),
+    csv_skip         = 0L
+  )
+  cfg <- build_config_list(wiz)
+  expect_null(cfg$col_names)
+  expect_null(cfg$csv_skip)
+})
+
 # ── update_global_config: unknown-key preservation (G-02) ────────────────────
 
 test_that("update_global_config preserves unknown top-level and rule keys", {

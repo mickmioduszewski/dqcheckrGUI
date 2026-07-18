@@ -70,8 +70,12 @@ sniff_file_encoding <- function(path) {
     det <- tryCatch(stringi::stri_enc_detect(window)[[1]], error = function(e) NULL)
     if (!is.null(det) && nrow(det) > 0) {
       # The whole file failed UTF-8 validation; drop Unicode candidates the
-      # detector may still offer for a locally-valid window.
-      det <- det[!grepl("^UTF", det$Encoding, ignore.case = TRUE), , drop = FALSE]
+      # detector may still offer for a locally-valid window. Also drop
+      # NA-encoding rows: stri_enc_detect can return one (e.g. a large,
+      # mostly-ASCII window with a single accented byte), which would otherwise
+      # propagate as top = NA and crash the edit-mode step-3 observer (B-14).
+      det <- det[!is.na(det$Encoding) &
+                 !grepl("^UTF", det$Encoding, ignore.case = TRUE), , drop = FALSE]
       if (nrow(det) > 0) {
         k    <- seq_len(min(3, nrow(det)))
         cand <- setNames(det$Encoding[k],

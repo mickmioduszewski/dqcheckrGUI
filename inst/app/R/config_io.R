@@ -134,17 +134,31 @@ build_config_list <- function(wiz) {
       if (length(wiz$col_names) > 0)
         cfg$col_names <- as.list(wiz$col_names)
     } else {
-      # Header present. Emit col_names + csv_skip = 1 ONLY when the names were
-      # changed away from the file's actual header (duplicate/invalid fixes or
-      # deliberate renames). A clean header — or one we couldn't probe — writes
-      # neither key, keeping the common case byte-identical to legacy output.
+      # Header present.
       raw <- as.character(wiz$raw_header_names %||% character(0))
-      renamed <- length(raw) > 0 &&
-                 length(wiz$col_names) == length(raw) &&
-                 !identical(as.character(wiz$col_names), raw)
-      if (renamed) {
-        cfg$col_names <- as.list(wiz$col_names)
-        cfg$csv_skip  <- 1L
+      if (length(raw) == 0) {
+        # Step 3 was never re-probed this session (edit mode resets
+        # raw_header_names to empty). We cannot recompute whether the header was
+        # renamed, so we must preserve whatever the loaded config already had: a
+        # renamed-header config carries explicit col_names + csv_skip >= 1, and
+        # dropping them here would silently revert the file to its unwanted
+        # original header on Save (B-06). A clean-header config has neither key
+        # (col_names empty), so this correctly emits nothing for it.
+        if (length(wiz$col_names) > 0 && (wiz$csv_skip %||% 0L) >= 1L) {
+          cfg$col_names <- as.list(wiz$col_names)
+          cfg$csv_skip  <- as.integer(wiz$csv_skip)
+        }
+      } else {
+        # Step 3 was probed this session. Emit col_names + csv_skip = 1 ONLY when
+        # the names were changed away from the file's actual header (duplicate/
+        # invalid fixes or deliberate renames). A clean header writes neither
+        # key, keeping the common case byte-identical to legacy output.
+        renamed <- length(wiz$col_names) == length(raw) &&
+                   !identical(as.character(wiz$col_names), raw)
+        if (renamed) {
+          cfg$col_names <- as.list(wiz$col_names)
+          cfg$csv_skip  <- 1L
+        }
       }
     }
   }

@@ -71,3 +71,21 @@ test_that("sniff_file_encoding() sees past a large all-ASCII head", {
   expect_false(identical(toupper(s$top), "ASCII"))
   unlink(path)
 })
+
+test_that("sniff_file_encoding() never returns an NA top for a stray high byte (B-14)", {
+  # A large, almost-entirely-ASCII window with a single non-ASCII byte is the
+  # shape stri_enc_detect can answer with an NA-encoding row. That must not
+  # propagate as top = NA (which crashed the edit-mode step-3 observer); the
+  # NA-drop filter has to fall back to a concrete legacy encoding.
+  path <- tempfile(fileext = ".csv")
+  con  <- file(path, open = "wb")
+  writeBin(charToRaw("name,city\n"), con)
+  writeBin(charToRaw(strrep("Mick,Sydney\n", 100000)), con)  # ~1.2 MB ASCII
+  writeBin(as.raw(0xFF), con)                                # one stray high byte
+  writeBin(charToRaw("\n"), con)
+  close(con)
+  s <- sniff_file_encoding(path)
+  expect_false(is.na(s$top))
+  expect_true(nzchar(s$top))
+  unlink(path)
+})

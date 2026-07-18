@@ -511,3 +511,31 @@ test_that("read_global_config falls back to defaults with a warning on a parse e
   expect_equal(cfg$snapshot_db, "data/snapshots.sqlite")   # defaults, not a crash
   expect_true(is.list(cfg$default_rules))
 })
+
+test_that("read_global_config reads a valid file through unchanged (B-20)", {
+  path <- withr::local_tempfile(fileext = ".yml")
+  yaml::write_yaml(list(
+    snapshot_db       = "custom/db.sqlite",
+    report_output_dir = "out/",
+    default_rules     = list(max_missing_rate = 0.5),
+    org_contact       = "team@example.org"      # unknown key preserved on read
+  ), path)
+  cfg <- read_global_config(path)
+  expect_equal(cfg$snapshot_db, "custom/db.sqlite")
+  expect_equal(cfg$default_rules$max_missing_rate, 0.5)
+  expect_equal(cfg$org_contact, "team@example.org")
+})
+
+test_that("default_global_config is the single source both callers share (B-22)", {
+  # The new-project scaffold (app.R) and read_global_config()'s fallback must
+  # build from the same structure; guard the keys so they cannot silently drift.
+  d <- default_global_config()
+  expect_equal(d$snapshot_db, "data/snapshots.sqlite")
+  expect_equal(d$report_output_dir, "reports/")
+  expect_setequal(names(d$default_rules), c(
+    "type_inference_threshold", "max_missing_rate", "max_non_numeric_rate",
+    "min_row_count", "max_row_count_change_pct", "max_numeric_mean_shift_pct",
+    "max_missing_rate_change_pp", "max_non_numeric_rate_change_pp",
+    "flag_new_columns", "flag_dropped_columns", "flag_type_changes",
+    "flag_column_order_change"))
+})

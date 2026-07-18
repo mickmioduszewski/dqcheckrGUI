@@ -48,25 +48,32 @@ read_config <- function(path) {
   list(known = known, extra = extra)
 }
 
-read_global_config <- function(path) {
-  defaults <- list(
+# Single source of truth for the default global config (spec §19). Both
+# read_global_config()'s fallback and the new-project scaffold in app.R build
+# from this, so the two definitions cannot drift apart (B-22).
+default_global_config <- function() {
+  list(
     snapshot_db       = "data/snapshots.sqlite",
     report_output_dir = "reports/",
     default_rules = list(
-      type_inference_threshold      = 0.90,
-      max_missing_rate              = 0.05,
-      max_non_numeric_rate          = 0.01,
-      min_row_count                 = 0,
-      max_row_count_change_pct      = 0.10,
-      max_numeric_mean_shift_pct    = 0.20,
-      max_missing_rate_change_pp    = 2.0,
-      max_non_numeric_rate_change_pp= 1.0,
-      flag_new_columns              = TRUE,
-      flag_dropped_columns          = TRUE,
-      flag_type_changes             = TRUE,
-      flag_column_order_change      = TRUE
+      type_inference_threshold       = 0.90,
+      max_missing_rate               = 0.05,
+      max_non_numeric_rate           = 0.01,
+      min_row_count                  = 0L,
+      max_row_count_change_pct       = 0.10,
+      max_numeric_mean_shift_pct     = 0.20,
+      max_missing_rate_change_pp     = 2.0,
+      max_non_numeric_rate_change_pp = 1.0,
+      flag_new_columns               = TRUE,
+      flag_dropped_columns           = TRUE,
+      flag_type_changes              = TRUE,
+      flag_column_order_change       = TRUE
     )
   )
+}
+
+read_global_config <- function(path) {
+  defaults <- default_global_config()
   if (!file.exists(path)) return(defaults)
   # A malformed global config must not crash the session at startup (this is
   # called unguarded when seeding the app's reactive config). Fall back to the

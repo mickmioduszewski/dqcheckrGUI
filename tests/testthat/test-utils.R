@@ -708,3 +708,26 @@ test_that("merge_column_rule collects the always-rendered pattern and missing-ra
   expect_equal(rules$pattern, "^[A-Z]$")
   expect_equal(rules$max_missing_rate, 0.1)
 })
+
+# ── js_string_escape: XSS guard for untrusted dataset names (B-21) ────────────
+
+test_that("js_string_escape escapes single quotes so a name can't break out", {
+  # A dataset name read back from a hand-placed config could carry a quote that
+  # would otherwise close the JS string literal it is interpolated into.
+  expect_equal(js_string_escape("O'Brien"), "O\\'Brien")
+})
+
+test_that("js_string_escape escapes backslashes before quotes (order matters)", {
+  # Backslash first, so the backslash introduced for an escaped quote is not
+  # itself re-escaped. A literal \' in the input must become \\\' , not \\' .
+  expect_equal(js_string_escape("a\\b"), "a\\\\b")
+  expect_equal(js_string_escape("a\\'b"), "a\\\\\\'b")
+})
+
+test_that("js_string_escape leaves an ordinary name unchanged", {
+  expect_equal(js_string_escape("refunds_2026"), "refunds_2026")
+})
+
+test_that("js_string_escape is vectorised over multiple names", {
+  expect_equal(js_string_escape(c("a'b", "c\\d")), c("a\\'b", "c\\\\d"))
+})

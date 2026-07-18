@@ -245,24 +245,7 @@ shinyApp(
         dir.create(cd,                        showWarnings = FALSE, recursive = TRUE)
         dir.create(file.path(root, "data"),    showWarnings = FALSE)
         dir.create(file.path(root, "reports"), showWarnings = FALSE)
-        default_cfg <- list(
-          snapshot_db       = "data/snapshots.sqlite",
-          report_output_dir = "reports/",
-          default_rules     = list(
-            type_inference_threshold       = 0.90,
-            max_missing_rate               = 0.05,
-            max_non_numeric_rate           = 0.01,
-            min_row_count                  = 0L,
-            max_row_count_change_pct       = 0.10,
-            max_numeric_mean_shift_pct     = 0.20,
-            max_missing_rate_change_pp     = 2.0,
-            max_non_numeric_rate_change_pp = 1.0,
-            flag_new_columns               = TRUE,
-            flag_dropped_columns           = TRUE,
-            flag_type_changes              = TRUE,
-            flag_column_order_change       = TRUE
-          )
-        )
+        default_cfg <- default_global_config()   # single source of truth (B-22)
         yaml::write_yaml(default_cfg, global_config_path(cd))
         gcfg_rv(read_global_config(global_config_path(cd)))
         register_all_report_paths(cd, default_cfg)

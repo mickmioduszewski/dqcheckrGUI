@@ -655,3 +655,56 @@ test_that("report_link_cell handles per-row prefixes and datasets (history panel
   expect_false(grepl("Open", cells[2]))
   expect_match(cells[3], "render failed")
 })
+
+# ── merge_column_rule (B-04: preserve rules across a type re-inference) ───────
+
+test_that("merge_column_rule keeps min/max/mean-shift when a numeric col re-infers as character (B-04)", {
+  # The bug: reopening on a differently-shaped sample infers 'character', so the
+  # min/max/mean-shift inputs never render (read NULL) and the saved rule is lost.
+  saved <- list(min_value = 0, max_value = 1000,
+                max_numeric_mean_shift_pct = 0.20)
+  rules <- merge_column_rule("character", saved,
+                             allowed_in = NULL, min_in = NULL, max_in = NULL,
+                             meanshift_in = NULL, maxmiss_in = 0.05)
+  expect_equal(rules$min_value, 0)                      # carried forward
+  expect_equal(rules$max_value, 1000)
+  expect_equal(rules$max_numeric_mean_shift_pct, 0.20)
+  expect_null(rules$allowed_values)
+})
+
+test_that("merge_column_rule keeps allowed_values when a character col re-infers as numeric (B-04)", {
+  saved <- list(allowed_values = c("GB", "US", "DE"))
+  rules <- merge_column_rule("numeric", saved,
+                             allowed_in = NULL,          # input not rendered
+                             min_in = NA, max_in = NA, meanshift_in = NA,
+                             maxmiss_in = 0.05)
+  expect_equal(rules$allowed_values, c("GB", "US", "DE"))   # carried forward
+  expect_null(rules$min_value)
+})
+
+test_that("merge_column_rule uses the rendered input when the type matches (authoritative)", {
+  rules <- merge_column_rule("numeric", list(min_value = 999),   # saved ignored
+                             min_in = 5, max_in = 10, meanshift_in = 20,
+                             maxmiss_in = 0.05)
+  expect_equal(rules$min_value, 5)
+  expect_equal(rules$max_value, 10)
+  expect_equal(rules$max_numeric_mean_shift_pct, 0.20)          # 20% -> 0.20
+})
+
+test_that("merge_column_rule respects a user clearing a rendered input", {
+  # numeric col, min input cleared (NA) -> the rule is dropped, not resurrected
+  # from saved, because the input WAS rendered and is authoritative.
+  rules <- merge_column_rule("numeric", list(min_value = 5),
+                             min_in = NA, max_in = NA, meanshift_in = NA,
+                             maxmiss_in = 0.05)
+  expect_null(rules$min_value)
+})
+
+test_that("merge_column_rule collects the always-rendered pattern and missing-rate", {
+  rules <- merge_column_rule("character", NULL,
+                             allowed_in = "A", pattern_in = "^[A-Z]$",
+                             maxmiss_in = 0.1)
+  expect_equal(rules$allowed_values, "A")
+  expect_equal(rules$pattern, "^[A-Z]$")
+  expect_equal(rules$max_missing_rate, 0.1)
+})

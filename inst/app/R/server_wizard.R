@@ -646,19 +646,19 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
       col   <- cols[i]
       ctype <- if (!is.null(wiz$col_types_override[[col]])) wiz$col_types_override[[col]]
                else if (i <= length(types)) types[i] else "character"
-      rules <- list()
-      av <- input[[wiz_input_id("s5_allowed", seq_no, i)]]
-      if (!is.null(av) && length(av) > 0 && any(nchar(av) > 0)) rules$allowed_values <- av
-      minv <- input[[wiz_input_id("s5_min", seq_no, i)]]
-      maxv <- input[[wiz_input_id("s5_max", seq_no, i)]]
-      if (!is.null(minv) && !is.na(minv)) rules$min_value <- minv
-      if (!is.null(maxv) && !is.na(maxv)) rules$max_value <- maxv
-      pat <- input[[wiz_input_id("s5_pattern", seq_no, i)]]
-      if (!is.null(pat) && nchar(pat) > 0) rules$pattern <- pat
-      miss <- input[[wiz_input_id("s5_maxmiss", seq_no, i)]]
-      if (!is.null(miss) && !is.na(miss)) rules$max_missing_rate <- miss
-      ms   <- input[[wiz_input_id("s5_maxmeanshift", seq_no, i)]]
-      if (!is.null(ms) && !is.na(ms)) rules$max_numeric_mean_shift_pct <- ms / 100
+      # merge_column_rule() carries forward a previously-saved type-gated rule
+      # (allowed_values / min / max / mean-shift) when this session re-inferred a
+      # different type, so its input never rendered -- otherwise Save would
+      # silently drop a rule the user never touched (B-04). isolate() reads the
+      # saved rule without making this writer depend on its own output.
+      rules <- merge_column_rule(
+        ctype, isolate(wiz$column_rules[[col]]),
+        allowed_in   = input[[wiz_input_id("s5_allowed",      seq_no, i)]],
+        min_in       = input[[wiz_input_id("s5_min",          seq_no, i)]],
+        max_in       = input[[wiz_input_id("s5_max",          seq_no, i)]],
+        pattern_in   = input[[wiz_input_id("s5_pattern",      seq_no, i)]],
+        maxmiss_in   = input[[wiz_input_id("s5_maxmiss",      seq_no, i)]],
+        meanshift_in = input[[wiz_input_id("s5_maxmeanshift", seq_no, i)]])
       if (length(rules) > 0) col_rules[[col]] <- rules
     }
     wiz$column_rules <- col_rules

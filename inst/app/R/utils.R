@@ -50,6 +50,53 @@ report_link_cell <- function(report_file, render_status, run_timestamp,
       '<span class="text-muted fst-italic">render failed</span>'))
 }
 
+# Merge one column's step-5 rule inputs with its previously-saved rule.
+#
+# The step-5 UI only renders the allowed-values input for a character/unknown
+# column and the min/max/mean-shift inputs for a numeric column. Because a
+# column's type is re-inferred each edit session (from the current file sample),
+# reopening the wizard on a differently-shaped delivery can render a different
+# set of rule inputs than the rule was saved under — and the collector would
+# then read the missing inputs as NULL and silently drop a rule the user never
+# touched (B-04). This gates on `ctype` exactly as the UI does: a rule's input
+# is authoritative only when the UI actually rendered it; otherwise the saved
+# value is carried forward. `saved` is the column's previously-stored rule list
+# (or NULL). Returns the merged rule list (may be empty).
+merge_column_rule <- function(ctype, saved,
+                              allowed_in = NULL, min_in = NULL, max_in = NULL,
+                              pattern_in = NULL, maxmiss_in = NULL,
+                              meanshift_in = NULL) {
+  if (is.null(saved)) saved <- list()
+  rules   <- list()
+  is_char <- ctype %in% c("character", "unknown")   # s5_allowed rendered
+  is_num  <- identical(ctype, "numeric")            # s5_min/max/meanshift rendered
+
+  if (is_char) {
+    if (!is.null(allowed_in) && length(allowed_in) > 0 && any(nchar(allowed_in) > 0))
+      rules$allowed_values <- allowed_in
+  } else if (!is.null(saved$allowed_values)) {
+    rules$allowed_values <- saved$allowed_values     # input not rendered -> keep
+  }
+
+  if (is_num) {
+    if (!is.null(min_in) && !is.na(min_in)) rules$min_value <- min_in
+    if (!is.null(max_in) && !is.na(max_in)) rules$max_value <- max_in
+    if (!is.null(meanshift_in) && !is.na(meanshift_in))
+      rules$max_numeric_mean_shift_pct <- meanshift_in / 100
+  } else {
+    if (!is.null(saved$min_value)) rules$min_value <- saved$min_value
+    if (!is.null(saved$max_value)) rules$max_value <- saved$max_value
+    if (!is.null(saved$max_numeric_mean_shift_pct))
+      rules$max_numeric_mean_shift_pct <- saved$max_numeric_mean_shift_pct
+  }
+
+  # Always-rendered inputs (no carry-forward needed -- they cannot fail to render).
+  if (!is.null(pattern_in) && nzchar(pattern_in)) rules$pattern <- pattern_in
+  if (!is.null(maxmiss_in) && !is.na(maxmiss_in)) rules$max_missing_rate <- maxmiss_in
+
+  rules
+}
+
 # Escape a string for safe embedding inside a single-quoted JavaScript string
 # literal — e.g. the dataset name interpolated into
 # onclick="Shiny.setInputValue('ds_action', {ds:'<name>', ...})". Backslashes

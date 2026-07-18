@@ -499,8 +499,8 @@ server_step3_csv <- function(input, output, session, wiz, gcfg_rv) {
     # writes wiz$col_names on every keystroke; if this panel re-rendered on each
     # change it would rebuild the DOM mid-edit, resetting the preview's scroll
     # position and fighting the cursor. We only want to rebuild when the column
-    # set itself changes (handled by the reactive reads above). Per CLAUDE.md,
-    # isolate() is the wizard's standard tool for exactly this.
+    # set itself changes (handled by the reactive reads above). isolate() is the
+    # wizard's standard tool for exactly this.
     isolate({
       seq_no  <- wiz$open_seq
       reasons <- wiz$col_name_reasons

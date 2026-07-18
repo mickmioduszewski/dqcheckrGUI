@@ -1,6 +1,5 @@
-# Integration test: run panel Stop flow (B-12, previously uncovered per CLAUDE.md
-# "Not yet tested"). Covers the race the fix addresses: a run that finishes while
-# the Stop-confirm dialog is open must have its real result collected, not be
+# Integration test: run panel Stop flow. Covers the race a run finishing while
+# the Stop-confirm dialog is open: its real result must be collected, not
 # overwritten with "stopped".
 
 library(shinytest2)

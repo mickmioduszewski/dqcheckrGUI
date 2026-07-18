@@ -1,8 +1,8 @@
-# Integration test: FWF ruler -> server boundary contract (B-13, previously
-# uncovered per CLAUDE.md "Not yet tested"). The ruler JS emits column boundaries
-# as fwf_boundary_positions; this drives that exact input (as a drag would) and
-# verifies the server turns it into the right fwf_widths and column definitions.
-# The raw interact.js drag mechanics are third-party and out of scope.
+# Integration test: FWF ruler -> server boundary contract. The ruler JS emits
+# column boundaries as fwf_boundary_positions; this drives that exact input (as a
+# drag would) and verifies the server turns it into the right fwf_widths and
+# column definitions. The raw interact.js drag mechanics are third-party and out
+# of scope.
 
 library(shinytest2)
 library(yaml)

@@ -1,7 +1,7 @@
-# Integration test: drift comparison launch + poll (B-11, previously uncovered
-# per CLAUDE.md "Not yet tested"). Seeds two real snapshots, drives the History
-# panel Compare button, and verifies the async callr launch -> 500ms poll ->
-# completion chain by asserting the rendered drift report actually lands on disk.
+# Integration test: drift comparison launch + poll. Seeds two real snapshots,
+# drives the History panel Compare button, and verifies the async callr launch ->
+# 500ms poll -> completion chain by asserting the rendered drift report actually
+# lands on disk.
 
 library(shinytest2)
 library(yaml)

@@ -51,25 +51,33 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
 
     if (mode == "edit" && !is.null(dataset_name)) {
       path <- file.path(config_dir(), paste0(dataset_name, ".yml"))
-      if (safe_file_exists(path)) {
-        cfg <- tryCatch(read_config(path), error=function(e) NULL)
-        if (!is.null(cfg)) {
-          k <- cfg$known
-          for (nm in names(k)) wiz[[nm]] <- k[[nm]]
-          wiz$extra_keys    <- cfg$extra
-          wiz$mode          <- "edit"
-          wiz$original_name <- dataset_name
-          wiz$current_step  <- 1L
-          # Trigger file preview
-          preview_path <- if (nchar(k$folder %||%"") > 0) {
-            files <- list_files_only(k$folder)
-            if (length(files) > 0) files[order(file.mtime(files), decreasing=TRUE)[1]] else ""
-          } else k$current_file %||% ""
-          if (nchar(preview_path) > 0) {
-            wiz$current_preview_path <- preview_path
-            load_raw_preview(session, preview_path, wiz)
-          }
-        }
+      cfg <- if (safe_file_exists(path))
+        tryCatch(read_config(path), error = function(e) NULL) else NULL
+      # A missing or unparseable config must NOT fall through to a blank step-1
+      # wizard: with mode left at the default "new", a subsequent Save would
+      # overwrite the unreadable config with an empty one. Tell the user and
+      # keep the wizard closed, leaving the file untouched (B-11).
+      if (is.null(cfg)) {
+        showNotification(
+          sprintf("Could not load config for '%s' — the file is missing or could not be parsed. It was left unchanged.",
+                  dataset_name),
+          type = "error", duration = 10)
+        return(invisible(NULL))
+      }
+      k <- cfg$known
+      for (nm in names(k)) wiz[[nm]] <- k[[nm]]
+      wiz$extra_keys    <- cfg$extra
+      wiz$mode          <- "edit"
+      wiz$original_name <- dataset_name
+      wiz$current_step  <- 1L
+      # Trigger file preview
+      preview_path <- if (nchar(k$folder %||%"") > 0) {
+        files <- list_files_only(k$folder)
+        if (length(files) > 0) files[order(file.mtime(files), decreasing=TRUE)[1]] else ""
+      } else k$current_file %||% ""
+      if (nchar(preview_path) > 0) {
+        wiz$current_preview_path <- preview_path
+        load_raw_preview(session, preview_path, wiz)
       }
     }
     rv$wizard_open <- TRUE

@@ -11,10 +11,21 @@ server_history <- function(input, output, session, rv, config_dir, gcfg_rv) {
       gcfg_rv()$snapshot_db, config_dir(),
       default = "data/snapshots.sqlite", mustWork = FALSE
     )
-    tryCatch({
-      df <- read_all_snapshot_history(db_path, n = hist_limit())
-      hist_data(df)
-    }, error = function(e) hist_data(data.frame()))
+    df <- tryCatch(
+      read_all_snapshot_history(db_path, n = hist_limit()),
+      error = function(e) {
+        d <- data.frame()
+        attr(d, "db_error") <- conditionMessage(e)
+        d
+      })
+    # A tagged read failure (corrupt/unreachable DB) must not masquerade as an
+    # empty history — tell the user their data could not be read (B-10). The
+    # tag rides along on the frame into the renderer, which picks the message.
+    err <- attr(df, "db_error")
+    if (!is.null(err))
+      showNotification(paste("Could not read run history:", err),
+                       type = "error", duration = 10)
+    hist_data(df)
   }
 
   # Refresh when section activated or after a run
@@ -32,8 +43,12 @@ server_history <- function(input, output, session, rv, config_dir, gcfg_rv) {
   output$history_table <- DT::renderDataTable({
     df <- hist_data()
     if (nrow(df) == 0) {
+      msg <- if (!is.null(attr(df, "db_error")))
+        "Could not read run history — the snapshot database may be missing or corrupt."
+      else
+        "No run history found. Run a quality check first."
       return(DT::datatable(
-        data.frame(Message = "No run history found. Run a quality check first."),
+        data.frame(Message = msg),
         options = list(dom = "t"), rownames = FALSE
       ))
     }

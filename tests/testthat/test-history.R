@@ -48,6 +48,35 @@ test_that("read_snapshot_history returns empty data frame for NULL path", {
   expect_equal(nrow(result), 0L)
 })
 
+# ── read_snapshot_history: error is distinguishable from "no runs" (B-10) ─────
+
+test_that("read_snapshot_history tags an empty frame with db_error on a read failure", {
+  # A file that exists but is not a valid SQLite DB -> dbConnect/query fails.
+  bad <- tempfile(fileext = ".sqlite")
+  writeLines("this is not a sqlite database", bad)
+  on.exit(unlink(bad), add = TRUE)
+  result <- suppressWarnings(suppressMessages(read_snapshot_history(bad, n = 10)))
+  expect_equal(nrow(result), 0L)
+  expect_false(is.null(attr(result, "db_error")))
+})
+
+test_that("read_snapshot_history does NOT tag a legitimately empty history", {
+  # Missing path and a real-but-empty DB are 'no runs', not errors: no tag.
+  expect_null(attr(read_snapshot_history("/no/such/path.sqlite", n = 10), "db_error"))
+  db <- make_test_snapshot_db()
+  result <- read_snapshot_history(db, dataset_name = "no_such_ds", n = 10)
+  expect_equal(nrow(result), 0L)
+  expect_null(attr(result, "db_error"))
+})
+
+test_that("read_latest_statuses logs (does not silently swallow) a read failure", {
+  bad <- tempfile(fileext = ".sqlite")
+  writeLines("this is not a sqlite database", bad)
+  on.exit(unlink(bad), add = TRUE)
+  expect_message(suppressWarnings(read_latest_statuses(bad)),
+                 "read_latest_statuses: query failed")
+})
+
 # ── read_snapshot_history: correct data ───────────────────────────────────────
 
 test_that("read_snapshot_history returns all rows when dataset_name is NULL", {

@@ -290,6 +290,12 @@ read_snapshot_history <- function(db_path, dataset_name = NULL, n = 10) {
   }, error = function(e) {
     message("read_snapshot_history: query failed for db_path '", db_path,
             "': ", conditionMessage(e))
+    # Tag the empty frame so the caller can distinguish a genuine read failure
+    # (corrupt/unreachable DB) from a legitimately empty history ("no runs
+    # yet") and surface the former instead of the reassuring empty state (B-10).
+    # The guard-clause return above (missing/empty db_path) is NOT tagged: that
+    # really is "no runs".
+    attr(empty, "db_error") <- conditionMessage(e)
     empty
   })
 }
@@ -307,7 +313,14 @@ read_latest_statuses <- function(db_path) {
       "SELECT dataset_name, overall_status FROM snapshots
        WHERE id IN (SELECT MAX(id) FROM snapshots GROUP BY dataset_name)")
     stats::setNames(df$overall_status, df$dataset_name)
-  }, error = function(e) character(0))
+  }, error = function(e) {
+    # Log rather than swallow silently: a corrupt/unreachable DB here blanks
+    # every sidebar status badge, and without a trace the cause is invisible.
+    # Matches the sibling read_snapshot_history's message (B-18).
+    message("read_latest_statuses: query failed for db_path '", db_path,
+            "': ", conditionMessage(e))
+    character(0)
+  })
 }
 
 read_all_snapshot_history <- function(db_path, n = 200) {

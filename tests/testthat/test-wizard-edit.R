@@ -298,6 +298,31 @@ test_that("renaming a dataset in edit mode removes the old config file", {
   expect_false(file.exists(file.path(cfg_dir, "rich_test_ds.yml")))
 })
 
+test_that("editing an unparseable config does not open a blank wizard (B-11)", {
+  skip_on_cran()
+  skip_if_not_installed("shinytest2")
+  skip_if_not_installed("dqcheckr")
+
+  cfg_dir <- make_test_config_dir()
+  # A syntactically invalid YAML: read_config() -> yaml::read_yaml() errors.
+  broken_path <- file.path(cfg_dir, "broken_ds.yml")
+  writeLines(c("dataset_name: broken_ds", "column_rules: [unterminated"), broken_path)
+  before <- readLines(broken_path)
+  app <- make_app_driver(cfg_dir)
+
+  open_edit(app, "broken_ds")
+
+  # The wizard must NOT have opened as a blank new dataset: the step-1 name
+  # input is never populated with the broken dataset's name (an open would set
+  # it). An error notification is shown instead.
+  expect_false(isTRUE(app$get_value(input = "wiz_dataset_name") == "broken_ds"))
+  notif <- app$get_html("#shiny-notification-panel")
+  expect_match(notif %||% "", "Could not load config", fixed = TRUE)
+
+  # And the unparseable file is left byte-identical — no blank overwrite.
+  expect_identical(readLines(broken_path), before)
+})
+
 test_that("renaming onto another existing dataset is blocked at save", {
   skip_on_cran()
   skip_if_not_installed("shinytest2")

@@ -105,7 +105,7 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
       gcfg <- gcfg_rv()
       if      (s == 1) wizard_step1_ui(wiz)
       else if (s == 2) wizard_step2_ui(wiz)
-      else if (s == 3) wizard_step3_ui()
+      else if (s == 3) wizard_step3_ui(wiz)
       else if (s == 4) wizard_step4_ui()
       else if (s == 5) wizard_step5_ui()
       else if (s == 6) wizard_step6_ui(wiz, gcfg)
@@ -570,7 +570,13 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
                  value=rules$max_missing_rate, min=0, max=1, step=0.01)),
           if (ctype == "numeric") {
             column(4, numericInput(wiz_input_id("s5_maxmeanshift", seq_no, i), "Max mean shift (%)",
-                   value=rules$max_numeric_mean_shift_pct, min=0, max=100, step=1))
+                   # Stored as a fraction; the field is a percent and
+                   # merge_column_rule() divides the input by 100, so display *100.
+                   # Keep NULL (empty) when no rule is saved for this column.
+                   value=if (length(rules$max_numeric_mean_shift_pct) &&
+                             !is.na(rules$max_numeric_mean_shift_pct))
+                           round(rules$max_numeric_mean_shift_pct * 100, 2) else NULL,
+                   min=0, max=100, step=1))
           }
         )
       )
@@ -757,6 +763,22 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
     cd     <- config_dir()
     path   <- file.path(cd, paste0(nm, ".yml"))
 
+    dir.create(cd, showWarnings=FALSE, recursive=TRUE)
+
+    # Serialise the clash-check-and-write against concurrent same-machine saves
+    # (two tabs / two app instances on one config dir). Without this, both pass
+    # the clash check below and both write, silently clobbering. Released on exit.
+    lock <- acquire_config_lock(cd, nm)
+    if (is.null(lock)) {
+      showModal(modalDialog(
+        title="Save in progress",
+        sprintf("Another save for '%s' is already in progress. Wait a moment and try again.", nm),
+        easyClose=TRUE
+      ))
+      return()
+    }
+    on.exit(unlink(lock, recursive=TRUE), add=TRUE)
+
     # Backstop for G-07: the step-1 validator shows the clash message, but
     # nothing stops navigation past it — block the overwrite at save time.
     existing <- list_dataset_configs(cd)
@@ -773,7 +795,6 @@ server_wizard <- function(input, output, session, rv, config_dir, gcfg_rv) {
     renamed <- wiz$mode == "edit" && nchar(wiz$original_name) > 0 &&
                !identical(nm, wiz$original_name)
 
-    dir.create(cd, showWarnings=FALSE, recursive=TRUE)
     tryCatch({
       write_config(wiz, wiz$extra_keys, path)
       if (renamed) {

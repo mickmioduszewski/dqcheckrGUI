@@ -337,9 +337,19 @@ read_all_snapshot_history <- function(db_path, n = 200) {
 infer_col_type_simple <- function(x, threshold = 0.90) {
   x <- x[!is.na(x) & x != ""]
   if (length(x) == 0) return("unknown")
-  date_fmts <- c("%Y-%m-%d","%d/%m/%Y","%m/%d/%Y","%Y%m%d","%d-%m-%Y")
-  for (fmt in date_fmts) {
-    parsed <- suppressWarnings(as.Date(x, format=fmt))
+  # Anchored shape guard, mirroring dqcheckr::infer_col_type. as.Date() delegates
+  # to strptime(), which matches a *prefix* — so "2024-01-15xyz" and the 9-digit
+  # id "202401159" (its first 8 chars parse under %Y%m%d) would both be accepted
+  # as dates. Requiring the whole string to match the format's shape first closes
+  # that, so the wizard preview agrees with run-time classification. Keep the
+  # formats/shapes in sync with dqcheckr::infer_col_type.
+  date_fmts   <- c("%Y-%m-%d","%d/%m/%Y","%m/%d/%Y","%Y%m%d","%d-%m-%Y")
+  date_shapes <- c("^[0-9]{4}-[0-9]{2}-[0-9]{2}$", "^[0-9]{2}/[0-9]{2}/[0-9]{4}$",
+                   "^[0-9]{2}/[0-9]{2}/[0-9]{4}$", "^[0-9]{8}$",
+                   "^[0-9]{2}-[0-9]{2}-[0-9]{4}$")
+  for (i in seq_along(date_fmts)) {
+    if (!all(grepl(date_shapes[[i]], x))) next
+    parsed <- suppressWarnings(as.Date(x, format=date_fmts[[i]]))
     if (all(!is.na(parsed))) return("date")
   }
   numeric_ok <- suppressWarnings(!is.na(as.numeric(x)))
@@ -418,6 +428,22 @@ register_report_resource_path <- function(report_output_dir, config_dir) {
 # writes to the global report dir, "dq_reports_<ds>" when it has its own
 # report_output_dir override (each override dir gets its own resource path —
 # a single static prefix can only map one directory).
+# Read a per-dataset config's `known` keys, logging (not swallowing) a parse
+# failure. A corrupt config otherwise silently falls back to the default report
+# prefix, producing a dead report link / unregistered resource path with no
+# diagnostic (B-06/G-09). Mirrors the "log rather than swallow" handling of the
+# snapshot-DB reads. Used by every site that resolves a per-dataset report dir.
+read_dataset_known <- function(config_dir, ds) {
+  tryCatch(
+    read_config(file.path(config_dir, paste0(ds, ".yml")))$known,
+    error = function(e) {
+      message("read_dataset_known: config for '", ds,
+              "' could not be parsed: ", conditionMessage(e))
+      NULL
+    }
+  )
+}
+
 report_url_prefix <- function(ds, ds_report_dir, config_dir, gcfg) {
   global_dir <- resolve_infra_path(gcfg$report_output_dir, config_dir,
                                    default = "reports/", mustWork = FALSE)
@@ -440,10 +466,7 @@ register_all_report_paths <- function(config_dir, gcfg) {
   global_dir <- resolve_infra_path(gcfg$report_output_dir, config_dir,
                                    default = "reports/", mustWork = FALSE)
   for (ds in list_dataset_configs(config_dir)) {
-    known <- tryCatch(
-      read_config(file.path(config_dir, paste0(ds, ".yml")))$known,
-      error = function(e) NULL
-    )
+    known <- read_dataset_known(config_dir, ds)
     if (is.null(known) || nchar(known$report_output_dir %||% "") == 0) next
     ds_dir <- resolve_infra_path(known$report_output_dir, config_dir,
                                  mustWork = FALSE)

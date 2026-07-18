@@ -101,8 +101,7 @@ server_run <- function(input, output, session, rv, config_dir, gcfg_rv) {
     rv_run$error_msg   <- NULL
     # URL prefix for this dataset's reports (per-dataset report_output_dir
     # overrides are served under their own resource path).
-    known <- tryCatch(read_config(file.path(cd, paste0(ds, ".yml")))$known,
-                      error = function(e) NULL)
+    known <- read_dataset_known(cd, ds)
     rv_run$report_prefix <- report_url_prefix(ds, known$report_output_dir,
                                               cd, gcfg_rv())
 

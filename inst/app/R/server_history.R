@@ -61,8 +61,7 @@ server_history <- function(input, output, session, rv, config_dir, gcfg_rv) {
     cd   <- config_dir()
     gcfg <- gcfg_rv()
     prefixes <- vapply(unique(df$dataset_name), function(ds) {
-      known <- tryCatch(read_config(file.path(cd, paste0(ds, ".yml")))$known,
-                        error = function(e) NULL)
+      known <- read_dataset_known(cd, ds)
       report_url_prefix(ds, known$report_output_dir, cd, gcfg)
     }, character(1))
     row_prefix <- unname(prefixes[df$dataset_name])

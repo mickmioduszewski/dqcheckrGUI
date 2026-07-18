@@ -38,6 +38,7 @@
 #' @importFrom shinyFiles shinyDirButton
 #' @importFrom shinyvalidate InputValidator
 #' @importFrom stats median
+#' @importFrom stringi stri_enc_isutf8
 #' @importFrom tools file_path_sans_ext
 #' @importFrom utils URLencode
 #' @importFrom yaml read_yaml

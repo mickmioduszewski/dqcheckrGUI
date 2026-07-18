@@ -153,6 +153,24 @@ test_that("infer_col_type_simple ignores NA and empty string when inferring", {
   expect_equal(infer_col_type_simple(c("1", "2", NA, "", "3")), "numeric")
 })
 
+# Regression (B-04): the anchored shape guard must match dqcheckr::infer_col_type,
+# so the wizard preview agrees with run-time classification. as.Date() prefix-
+# matches, so without the guard a 9-digit id parses as a date.
+test_that("infer_col_type_simple rejects 9-digit ids as dates (matches dqcheckr)", {
+  expect_equal(infer_col_type_simple(c("202401159","202401160","202401161")),
+               "numeric")
+})
+
+test_that("infer_col_type_simple rejects date-with-trailing-junk", {
+  expect_equal(infer_col_type_simple(c("2024-01-15xyz","2024-02-20abc")),
+               "character")
+})
+
+test_that("infer_col_type_simple still accepts genuine 8-digit %Y%m%d dates", {
+  expect_equal(infer_col_type_simple(c("20240115","20240220","20231231")),
+               "date")
+})
+
 # ── safe_file_exists / safe_dir_exists ───────────────────────────────────────
 
 test_that("safe_file_exists returns TRUE for existing file", {

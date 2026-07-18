@@ -47,7 +47,7 @@ wizard_step2_ui <- function(wiz) {
 }
 
 # ── Step 3: Format & Structure (CSV or FWF) ─────────────────────────────
-wizard_step3_ui <- function() {
+wizard_step3_ui <- function(wiz) {
   tagList(
     h5("Step 3 — Format and Structure"),
     div(class="mt-3",
@@ -70,7 +70,7 @@ wizard_step3_ui <- function() {
         column(4,
           radioButtons("wiz_format", "Format",
                        choices=c("CSV"="csv","Fixed-Width (FWF)"="fwf"),
-                       selected="csv", inline=TRUE)
+                       selected=wiz$format %||% "csv", inline=TRUE)
         )
       ),
       uiOutput("step3_csv_fields"),

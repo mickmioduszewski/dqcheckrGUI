@@ -190,8 +190,20 @@ build_config_list <- function(wiz) {
   if (length(wiz$key_columns) > 0)
     cfg$key_columns <- as.list(wiz$key_columns)
 
-  if (length(wiz$col_types_override) > 0)
-    cfg$column_types <- wiz$col_types_override
+  # Column types. CSV: Step-4 overrides (only non-"auto" picks stored). FWF has
+  # no Step 4 (it needs wiz$col_names, empty for FWF) — the Step-3 per-column
+  # type selector writes wiz$col_types_inferred (named by fwf_col_names). Prefer
+  # those when populated; fall back to the loaded overrides so an edit-mode
+  # resave that never revisited Step 3 does not drop the saved types.
+  col_types <- if (wiz$format == "fwf" &&
+                   length(wiz$col_types_inferred) > 0 &&
+                   !is.null(names(wiz$col_types_inferred))) {
+    as.list(wiz$col_types_inferred)
+  } else {
+    wiz$col_types_override
+  }
+  if (length(col_types) > 0)
+    cfg$column_types <- col_types
 
   # Build column_rules — only include columns that have at least one rule
   col_rules <- list()
@@ -238,6 +250,28 @@ write_yaml_atomic <- function(x, path) {
       stop(sprintf("Could not write config to '%s'.", path), call. = FALSE)
   }
   invisible(path)
+}
+
+# Best-effort mutex around the save critical section (the name-clash check and
+# the write are otherwise a check-then-act race). dir.create() is an atomic
+# test-and-set on the local filesystem, so it serialises concurrent saves from
+# the SAME machine (e.g. two browser tabs / two app instances on one shared
+# config dir). Cross-machine concurrent saves on a OneDrive/SMB sync share are
+# NOT closable this way — a remote lock is not visible until sync propagates —
+# and remain a known limitation of a file-based config store. A crashed save
+# would otherwise leave a lock dir behind and wedge all future saves of that
+# dataset, so a lock older than stale_seconds is reclaimed. Returns the lock
+# path on success (release with unlink(recursive=TRUE)), or NULL if held.
+acquire_config_lock <- function(config_dir, dataset_name, stale_seconds = 60) {
+  lock <- file.path(config_dir, paste0(".", dataset_name, ".yml.lock"))
+  if (dir.create(lock, showWarnings = FALSE)) return(lock)
+  info <- file.info(lock)
+  if (!is.na(info$mtime) &&
+      as.numeric(difftime(Sys.time(), info$mtime, units = "secs")) > stale_seconds) {
+    unlink(lock, recursive = TRUE)
+    if (dir.create(lock, showWarnings = FALSE)) return(lock)
+  }
+  NULL
 }
 
 write_config <- function(wiz, extra, path) {

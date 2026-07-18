@@ -31,7 +31,7 @@ sniff_csv_file <- function(path, threshold = 0.90) {
          col_names  = names(df),
          col_types  = vapply(df, infer_col_type_simple, character(1),
                              threshold = threshold))
-  }, error = function(e) NULL)
+  }, error = function(e) list(sniff_error = conditionMessage(e)))
 }
 
 # Full-file encoding sniff. "Is this valid UTF-8?" is decidable by scanning
@@ -192,12 +192,27 @@ server_step3_csv <- function(input, output, session, wiz, gcfg_rv) {
 
     sniff <- sniff_csv_file(path, wiz_type_threshold(wiz, gcfg_rv()))
 
+    # A failed sniff must not fail silently (twin of the FWF auto-detect
+    # notification): the user picked a CSV and expects delimiter/header/columns
+    # to populate. sniff_csv_file marks a caught error with $sniff_error.
+    if (!is.null(sniff) && !is.null(sniff$sniff_error)) {
+      showNotification(
+        paste("Could not analyse the CSV file:", sniff$sniff_error),
+        type = "error", duration = 10)
+      sniff <- NULL
+    }
+
     if (!is.null(sniff) && !is.null(sniff$col_names)) {
       wiz$sniff_col_names <- sniff$col_names
       wiz$sniff_col_types <- sniff$col_types
     }
 
-    enc_sniff <- tryCatch(sniff_file_encoding(path), error = function(e) NULL)
+    enc_sniff <- tryCatch(sniff_file_encoding(path), error = function(e) {
+      showNotification(
+        paste("Could not detect the file encoding:", conditionMessage(e)),
+        type = "warning", duration = 8)
+      NULL
+    })
     top_enc     <- NULL
     enc_choices <- NULL
     if (!is.null(enc_sniff)) {
@@ -396,13 +411,17 @@ server_step3_csv <- function(input, output, session, wiz, gcfg_rv) {
       name_id <- wiz_input_id("fwf_col_name", seq_no, i)
       type_id <- wiz_input_id("fwf_col_type", seq_no, i)
       current_name <- if (i <= length(wiz$fwf_col_names)) wiz$fwf_col_names[i] else paste0("col_", i)
+      # Restore a previously-saved type (loaded into col_types_override) so
+      # revisiting Step 3 in edit mode does not reset the selector to "character".
+      saved_type <- wiz$col_types_override[[current_name]] %||% "character"
+      if (!saved_type %in% c("character","numeric","date")) saved_type <- "character"
       fluidRow(class="mb-1 align-items-center",
         column(1, span(class="badge bg-secondary", i)),
         column(2, span(class="text-muted", style="font-size:12px;", sprintf("%d–%d", starts[i], starts[i]+wiz$fwf_widths[i]-1L))),
         column(2, span(class="text-muted", style="font-size:12px;", paste("w:", wiz$fwf_widths[i]))),
         column(4, textInput(name_id, NULL, value=current_name, placeholder=paste0("col_", i))),
         column(3, selectInput(type_id, NULL, width="100%",
-          choices=c("character","numeric","date"), selected="character"))
+          choices=c("character","numeric","date"), selected=saved_type))
       )
     })
 
@@ -430,6 +449,11 @@ server_step3_csv <- function(input, output, session, wiz, gcfg_rv) {
     n <- length(wiz$fwf_widths)
     seq_no <- wiz$open_seq
     if (n == 0) return()
+    # Bail until THIS open's Step-3 type inputs have rendered (mirrors the Step-4
+    # collector). Otherwise the un-rendered inputs read NULL and would overwrite
+    # col_types_inferred with all-"character", clobbering saved FWF types on an
+    # edit-mode resave where the user never visited Step 3.
+    if (is.null(input[[wiz_input_id("fwf_col_type", seq_no, 1)]])) return()
     col_names <- wiz$fwf_col_names
     types_vec <- character(n)
     for (i in seq_len(n)) {

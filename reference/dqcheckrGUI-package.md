@@ -21,9 +21,9 @@ Windows and OneDrive setups:
 ## Related packages
 
 dqcheckrGUI delegates all data processing to dqcheckr. See
-[`vignette("dqcheckr", package = "dqcheckr")`](https://cran.rstudio.com/web/packages/dqcheckr/vignettes/dqcheckr.html)
+[`vignette("dqcheckr", package = "dqcheckr")`](https://mickmioduszewski.github.io/dqcheckr/articles/dqcheckr.html)
 for the core package introduction and
-[`vignette("specification", package = "dqcheckr")`](https://cran.rstudio.com/web/packages/dqcheckr/vignettes/specification.html)
+[`vignette("specification", package = "dqcheckr")`](https://mickmioduszewski.github.io/dqcheckr/articles/specification.html)
 for the full config/schema reference.
 
 These packages are only called from the 'shiny' app sourced at runtime

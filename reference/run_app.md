@@ -35,8 +35,8 @@ Called for its side effect; does not return a value.
 
 [`vignette("dqcheckrGUI", package = "dqcheckrGUI")`](https://mickmioduszewski.github.io/dqcheckrGUI/articles/dqcheckrGUI.md)
 for a full setup walkthrough.
-[`run_dq_check`](https://rdrr.io/pkg/dqcheckr/man/run_dq_check.html) for
-the underlying check function.
+[`run_dq_check`](https://mickmioduszewski.github.io/dqcheckr/reference/run_dq_check.html)
+for the underlying check function.
 
 ## Examples
 

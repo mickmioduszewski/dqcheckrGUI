@@ -195,7 +195,7 @@ Enter a short machine-readable name for the dataset. Names must start
 with a letter and contain only letters, numbers, and underscores (e.g.
 `customer_accounts`). This name is used as the config filename and
 passed directly to
-[`dqcheckr::run_dq_check()`](https://rdrr.io/pkg/dqcheckr/man/run_dq_check.html).
+[`dqcheckr::run_dq_check()`](https://mickmioduszewski.github.io/dqcheckr/reference/run_dq_check.html).
 
 An optional free-text description can also be added.
 
@@ -340,7 +340,7 @@ parses without syntax errors, and defines the expected function. A green
 badge confirms a valid file; a red badge shows the specific problem.
 
 Leave this field blank to skip custom checks. See
-[`vignette("dqcheckr", package = "dqcheckr")`](https://cran.rstudio.com/web/packages/dqcheckr/vignettes/dqcheckr.html)
+[`vignette("dqcheckr", package = "dqcheckr")`](https://mickmioduszewski.github.io/dqcheckr/articles/dqcheckr.html)
 for the custom checks function signature and return value.
 
 ### Step 8 — Review and save

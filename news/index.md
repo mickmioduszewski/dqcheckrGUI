@@ -1,5 +1,60 @@
 # Changelog
 
+## dqcheckrGUI (development version)
+
+### Bug fixes
+
+- The drift-comparison report link now works again. The GUI located the
+  rendered drift report by reconstructing its filename with a fixed
+  pattern, which stopped matching once dqcheckr’s drift filenames gained
+  a snapshot-id suffix — so every drift comparison reported “report not
+  found” even though it rendered. The GUI now uses the report path
+  `compare_snapshots()` returns directly (requires dqcheckr \>= 0.2.5
+  behaviour), removing the fragile filename contract.
+
+- Report links in the dataset panel now account for a report that is
+  still rendering. A snapshot whose `render_status` is `"pending"`
+  (dqcheckr 0.2.5+) no longer gets a clickable “Open” link to a file
+  that is not yet on disk; it shows “rendering…” until the report is
+  written. A filename is only reconstructed for a genuine pre-0.2.3 row,
+  not whenever one is absent.
+
+- The `dqcheckr` dependency floor was raised to the version whose
+  behaviour the report and drift link builders rely on.
+
+- Config-file writes are now crash-safe. Both dataset configs and the
+  global `dqcheckr.yml` are written to a temporary file and renamed into
+  place, so an interrupted write (process killed, power loss, a
+  contended OneDrive/network share) can no longer leave the sole config
+  for a dataset truncated and unparseable.
+
+- A malformed global `dqcheckr.yml` no longer crashes the session at
+  startup or gets silently overwritten with a trimmed copy on save.
+  Startup falls back to the built-in defaults with a warning, and a save
+  aborts with “Save failed” rather than wiping keys it could not read.
+
+- Read failures are no longer disguised as empty results. A corrupt or
+  unreachable snapshot database is reported distinctly instead of
+  showing “No run history found”, and editing a dataset whose YAML
+  cannot be parsed now shows an explicit error and leaves the file
+  untouched, rather than opening a blank wizard that would overwrite it
+  on save.
+
+- Background-process races were fixed. Clicking Stop on a run that
+  finished in the same instant now reports its real PASS/WARN/FAIL
+  result instead of “stopped”, and a second drift comparison launched
+  while one is still running is refused rather than orphaning the first.
+
+- A renamed-header CSV config no longer loses its `col_names`/`csv_skip`
+  when edited and saved without re-visiting the structure step, and the
+  step-3 encoding sniffer no longer crashes on a large, mostly-ASCII
+  file whose charset detector returns an indeterminate result.
+
+- Hardened the observers behind client-settable inputs so a malformed
+  payload can no longer error them, and added test coverage for the run
+  panel, the global-config reader, and the dataset-name JavaScript
+  escaper.
+
 ## dqcheckrGUI 0.2.2
 
 ### Bug fixes
@@ -156,7 +211,7 @@ CRAN release: 2026-06-29
   ‘dqcheckr’ vignettes.
 - [`?run_app`](https://mickmioduszewski.github.io/dqcheckrGUI/reference/run_app.md)
   gains `@seealso` links to the vignette and
-  [`dqcheckr::run_dq_check`](https://rdrr.io/pkg/dqcheckr/man/run_dq_check.html).
+  [`dqcheckr::run_dq_check`](https://mickmioduszewski.github.io/dqcheckr/reference/run_dq_check.html).
 
 ### Testing
 

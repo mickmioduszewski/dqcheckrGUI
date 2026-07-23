@@ -2,6 +2,13 @@
 
 server_run <- function(input, output, session, rv, config_dir, gcfg_rv) {
 
+  # Per-run stdout logs are tempfile()s; without cleanup they accumulate in
+  # tempdir() for the life of a long-running Shiny server process (B-11). Track
+  # each and remove them all when the session ends.
+  .run_logs <- new.env(parent = emptyenv())
+  .run_logs$paths <- character(0)
+  session$onSessionEnded(function() unlink(.run_logs$paths))
+
   rv_run <- reactiveValues(
     r_process  = NULL,
     log_path   = NULL,
@@ -94,6 +101,7 @@ server_run <- function(input, output, session, rv, config_dir, gcfg_rv) {
     cd <- config_dir()
 
     rv_run$log_path  <- tempfile("dqcheckr_run_", fileext=".log")
+    .run_logs$paths  <- c(.run_logs$paths, rv_run$log_path)   # unlinked on session end (B-11)
     rv_run$log_lines <- character(0)
     rv_run$log_bytes <- NULL
     rv_run$status    <- "running"
@@ -130,14 +138,7 @@ server_run <- function(input, output, session, rv, config_dir, gcfg_rv) {
     # message. Mirrors the pattern already used for drift failures in
     # server_history.R's poll observer.
     result <- tryCatch(proc$get_result(), error = function(e) {
-      last_line <- tryCatch({
-        lp <- rv_run$log_path
-        if (!is.null(lp) && file.exists(lp)) {
-          lines <- readLines(lp, warn = FALSE)
-          lines <- lines[nchar(trimws(lines)) > 0]
-          if (length(lines) > 0) tail(lines, 1) else ""
-        } else ""
-      }, error = function(e2) "")
+      last_line <- tail_nonblank_log_line(rv_run$log_path)
       msg <- if (nchar(last_line) > 0) last_line else conditionMessage(e)
       rv_run$error_msg <- paste("Run failed:", msg)
       NULL

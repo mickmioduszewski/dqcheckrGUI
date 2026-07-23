@@ -168,6 +168,15 @@ build_config_list <- function(wiz) {
         }
       }
     }
+
+    # Preserve a standalone csv_skip (skip N preamble rows, then auto-detect the
+    # header) that is not tied to a col_names rename. Both header branches above
+    # only emit csv_skip alongside col_names, so a config carrying csv_skip with
+    # no col_names would otherwise be silently dropped on resave and its skipped
+    # preamble rows read as data (B-03). The rename case already set col_names,
+    # so guarding on is.null(cfg$col_names) avoids a double-write.
+    if (is.null(cfg$col_names) && (wiz$csv_skip %||% 0L) >= 1L)
+      cfg$csv_skip <- as.integer(wiz$csv_skip)
   }
 
   if (wiz$file_mode == "folder") {
@@ -265,9 +274,29 @@ write_yaml_atomic <- function(x, path) {
 acquire_config_lock <- function(config_dir, dataset_name, stale_seconds = 60) {
   lock <- file.path(config_dir, paste0(".", dataset_name, ".yml.lock"))
   if (dir.create(lock, showWarnings = FALSE)) return(lock)
-  info <- file.info(lock)
-  if (!is.na(info$mtime) &&
-      as.numeric(difftime(Sys.time(), info$mtime, units = "secs")) > stale_seconds) {
+
+  info  <- file.info(lock)
+  stale <- !is.na(info$mtime) &&
+           as.numeric(difftime(Sys.time(), info$mtime, units = "secs")) > stale_seconds
+  if (!stale) return(NULL)
+
+  # Serialise stale-lock reclaim through a short-lived meta-lock so at most one
+  # caller ever removes-and-recreates the lock. The old unlink()-then-
+  # dir.create() was a check-then-act: several callers who all saw the stale
+  # lock both recreated it and both "acquired" it (B-13). The meta-lock is
+  # created with the same atomic dir.create() and released on exit; re-checking
+  # staleness while holding it prevents clobbering a lock another caller
+  # refreshed in the meantime. (A hard crash in the microsecond between taking
+  # the meta-lock and releasing it could wedge reclaim of this one lock — far
+  # rarer, and less harmful, than the double-grant it replaces.)
+  reclaim <- paste0(lock, ".reclaim")
+  if (!dir.create(reclaim, showWarnings = FALSE)) return(NULL)
+  on.exit(unlink(reclaim, recursive = TRUE), add = TRUE)
+
+  info2 <- file.info(lock)
+  still_stale <- is.na(info2$mtime) ||
+                 as.numeric(difftime(Sys.time(), info2$mtime, units = "secs")) > stale_seconds
+  if (still_stale) {
     unlink(lock, recursive = TRUE)
     if (dir.create(lock, showWarnings = FALSE)) return(lock)
   }

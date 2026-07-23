@@ -401,6 +401,13 @@ The drift report opens in a new tab, showing column-by-column changes between
 the two snapshots. The button is disabled with a tooltip if the selected rows
 are from different datasets.
 
+**Known limitation — per-dataset snapshot databases.** The History table reads
+the *global* snapshot database only. If a dataset overrides `snapshot_db` at the
+dataset level (writing its runs to a different SQLite file), those runs are not
+listed in this table. When that is the case the panel shows a note naming the
+affected datasets, so the omission is visible. Drift comparison for those
+datasets is unaffected — it reads each dataset's own database.
+
 ---
 
 ## Global configuration

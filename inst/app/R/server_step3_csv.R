@@ -42,26 +42,38 @@ sniff_csv_file <- function(path, threshold = 0.90) {
 # sample is never trusted for this: the file that motivated this scan had its
 # first accented byte ~4M rows in, and readr::guess_encoding()'s head sample
 # confidently reported "ASCII".
-sniff_file_encoding <- function(path) {
-  size <- suppressWarnings(file.size(path))
-  if (is.na(size) || size <= 0)
-    return(list(top = "UTF-8", certain = TRUE, candidates = c("UTF-8" = "UTF-8")))
+# Trailing bytes of `buf` that may be an incomplete multi-byte UTF-8 sequence
+# continuing in the next chunk — they must be held back rather than validated at
+# a chunk boundary, or a valid sequence split across chunks would false-negative
+# the validity check. Returns 0 unless the buffer ends with a genuinely
+# incomplete lead+continuation run. Mirrors dqcheckr's .utf8_incomplete_tail
+# (kept in sync so the wizard preview matches the run-time scan).
+.utf8_incomplete_tail <- function(buf) {
+  n <- length(buf)
+  if (n == 0L) return(0L)
+  i <- n; cont <- 0L
+  while (i >= 1L && cont < 3L && bitwAnd(as.integer(buf[i]), 0xC0L) == 0x80L) {
+    cont <- cont + 1L; i <- i - 1L
+  }
+  if (i < 1L) return(0L)                 # only continuation bytes: malformed
+  lead <- as.integer(buf[i])
+  need <- if (bitwAnd(lead, 0x80L) == 0x00L) 1L
+          else if (bitwAnd(lead, 0xE0L) == 0xC0L) 2L
+          else if (bitwAnd(lead, 0xF0L) == 0xE0L) 3L
+          else if (bitwAnd(lead, 0xF8L) == 0xF0L) 4L
+          else 1L
+  have <- cont + 1L
+  if (need > 1L && have < need) have else 0L
+}
 
-  raw <- readBin(path, what = "raw", n = size)
-  if (stringi::stri_enc_isutf8(raw))
-    return(list(top = "UTF-8", certain = TRUE,
-                candidates = c("UTF-8 (validated, whole file)" = "UTF-8")))
-
-  # Not valid UTF-8: give the charset detector the first chunk that actually
-  # contains non-ASCII bytes. Chunking is safe for this search because
-  # "contains a byte above 127" is a per-byte property.
-  window <- NULL
-  chunk  <- 1e6
-  start  <- 1
-  n      <- length(raw)
+# Statistically guess the legacy encoding of a buffer known to contain non-ASCII
+# bytes: locate the first 1MB window with a byte > 127 and run ICU's detector.
+# Chunking the search is safe because "contains a byte above 127" is a per-byte
+# property (unlike UTF-8 sequence validity).
+.guess_legacy_candidates <- function(raw) {
+  window <- NULL; chunk <- 1e6; start <- 1; n <- length(raw)
   while (start <= n) {
-    end   <- min(start + chunk - 1, n)
-    piece <- raw[start:end]
+    end   <- min(start + chunk - 1, n); piece <- raw[start:end]
     if (!stringi::stri_enc_isascii(piece)) { window <- piece; break }
     start <- end + 1
   }
@@ -69,11 +81,9 @@ sniff_file_encoding <- function(path) {
   if (!is.null(window)) {
     det <- tryCatch(stringi::stri_enc_detect(window)[[1]], error = function(e) NULL)
     if (!is.null(det) && nrow(det) > 0) {
-      # The whole file failed UTF-8 validation; drop Unicode candidates the
-      # detector may still offer for a locally-valid window. Also drop
-      # NA-encoding rows: stri_enc_detect can return one (e.g. a large,
-      # mostly-ASCII window with a single accented byte), which would otherwise
-      # propagate as top = NA and crash the edit-mode step-3 observer (B-14).
+      # Drop Unicode candidates the detector may offer for a locally-valid
+      # window (the whole file already failed UTF-8), and NA-encoding rows that
+      # would otherwise propagate as top = NA and crash the step-3 observer.
       det <- det[!is.na(det$Encoding) &
                  !grepl("^UTF", det$Encoding, ignore.case = TRUE), , drop = FALSE]
       if (nrow(det) > 0) {
@@ -84,7 +94,42 @@ sniff_file_encoding <- function(path) {
     }
   }
   if (is.null(cand)) cand <- c("ISO-8859-1" = "ISO-8859-1")
-  list(top = cand[[1]], certain = FALSE, candidates = cand)
+  cand
+}
+
+sniff_file_encoding <- function(path, chunk_size = 64L * 1024L * 1024L) {
+  size <- suppressWarnings(file.size(path))
+  if (is.na(size) || size <= 0)
+    return(list(top = "UTF-8", certain = TRUE, candidates = c("UTF-8" = "UTF-8")))
+
+  # Stream the file in bounded chunks rather than reading it into one raw vector
+  # the full size of the file: a multi-GB delivery would otherwise block the
+  # single-threaded reactive session and risk OOM (B-10). A head-sample shortcut
+  # is unsafe — the first invalid/accented byte can sit arbitrarily deep (the
+  # exact trap this scan exists to catch), so the whole file is still verified.
+  con <- file(path, open = "rb")
+  on.exit(close(con), add = TRUE)
+  carry <- raw(0)
+  repeat {
+    chunk <- readBin(con, what = "raw", n = chunk_size)
+    if (length(chunk) == 0L) break
+    buf    <- if (length(carry) > 0L) c(carry, chunk) else chunk
+    tail_n <- .utf8_incomplete_tail(buf)
+    head_n <- length(buf) - tail_n
+    head_bytes <- if (head_n > 0L) buf[seq_len(head_n)] else raw(0)
+    carry      <- if (tail_n > 0L) buf[seq.int(head_n + 1L, length(buf))] else raw(0)
+    if (length(head_bytes) > 0L && !stringi::stri_enc_isutf8(head_bytes)) {
+      cand <- .guess_legacy_candidates(head_bytes)
+      return(list(top = cand[[1]], certain = FALSE, candidates = cand))
+    }
+  }
+  # Bytes still held at EOF are a multi-byte sequence truncated by the file end.
+  if (length(carry) > 0L && !stringi::stri_enc_isutf8(carry)) {
+    cand <- .guess_legacy_candidates(carry)
+    return(list(top = cand[[1]], certain = FALSE, candidates = cand))
+  }
+  list(top = "UTF-8", certain = TRUE,
+       candidates = c("UTF-8 (validated, whole file)" = "UTF-8"))
 }
 
 load_raw_preview <- function(session, path, wiz) {
@@ -108,6 +153,21 @@ server_step3_csv <- function(input, output, session, wiz, gcfg_rv) {
   # CSV fields shown/hidden
   output$step3_csv_fields <- renderUI({
     req(input$wiz_format == "csv")
+    # A delimiter/quote loaded from a saved config may sit outside the fixed
+    # choice list (the wizard's own "Other" delimiter, or a hand-authored
+    # config). A plain <select> whose `selected` is absent from `choices`
+    # silently falls back to its first option, and the input observer then
+    # overwrites wiz$ with that wrong default on edit-reopen (B-01). So map a
+    # non-standard delimiter to the "Other" branch, and widen the quote choices
+    # to include whatever was loaded, so the real value round-trips visibly.
+    std_delims  <- c(",", "\t", ";", "|", " ", ":")
+    cur_delim   <- wiz$delimiter %||% ","
+    delim_sel   <- if (cur_delim %in% std_delims) cur_delim else "other"
+    quote_choices <- c('Double quote "'='"', "Single quote '"="'", "None"="")
+    cur_quote   <- wiz$quote_char %||% '"'
+    if (!(cur_quote %in% quote_choices))
+      quote_choices <- c(quote_choices,
+                         setNames(cur_quote, sprintf("Custom (%s)", cur_quote)))
     tagList(
       fluidRow(
         column(3,
@@ -115,7 +175,7 @@ server_step3_csv <- function(input, output, session, wiz, gcfg_rv) {
             choices=c("Comma (,)"=",", "Tab"="\t", "Semicolon (;)"=";",
                       "Pipe (|)"="|", "Space"=" ", "Colon (:)"=":",
                       "Other"="other"),
-            selected=wiz$delimiter %||% ",")
+            selected=delim_sel)
         ),
         column(3,
           uiOutput("step3_other_delimiter")
@@ -127,8 +187,8 @@ server_step3_csv <- function(input, output, session, wiz, gcfg_rv) {
         ),
         column(3,
           selectInput("wiz_quote_char", "Quote character",
-            choices=c('Double quote "'='"', "Single quote '"="'", "None"=""),
-            selected=wiz$quote_char %||% '"')
+            choices=quote_choices,
+            selected=cur_quote)
         )
       ),
       fluidRow(
@@ -147,7 +207,12 @@ server_step3_csv <- function(input, output, session, wiz, gcfg_rv) {
 
   output$step3_other_delimiter <- renderUI({
     req(input$wiz_delimiter == "other")
-    textInput("wiz_delimiter_custom", "Custom:", value="", width="80px")
+    # Pre-fill with the loaded custom delimiter on edit-reopen so it survives
+    # the round-trip (B-01); empty for a fresh "Other" selection.
+    std_delims <- c(",", "\t", ";", "|", " ", ":")
+    cur <- isolate(wiz$delimiter)
+    val <- if (!is.null(cur) && !(cur %in% std_delims)) cur else ""
+    textInput("wiz_delimiter_custom", "Custom:", value=val, width="80px")
   })
 
   output$step3_fwf_fields <- renderUI({
@@ -353,7 +418,15 @@ server_step3_csv <- function(input, output, session, wiz, gcfg_rv) {
   observeEvent(input$wiz_format,    { wiz$format    <- input$wiz_format
     if (input$wiz_format == "fwf") session$sendCustomMessage("fwf_ruler_activate", list())
     else session$sendCustomMessage("fwf_ruler_deactivate", list()) })
-  observeEvent(input$wiz_delimiter, { wiz$delimiter  <- if(input$wiz_delimiter=="other") input$wiz_delimiter_custom %||% "," else input$wiz_delimiter })
+  # On "Other" with an empty/not-yet-rendered custom field, keep the existing
+  # wiz$delimiter instead of clobbering it to "," — otherwise a loaded custom
+  # delimiter is lost on the observer's init fire before the text box renders
+  # (B-01). isolate() avoids a write-read reactive loop on wiz$delimiter.
+  observeEvent(input$wiz_delimiter, { wiz$delimiter  <- if(input$wiz_delimiter=="other") input$wiz_delimiter_custom %||% isolate(wiz$delimiter) %||% "," else input$wiz_delimiter })
+  observeEvent(input$wiz_delimiter_custom, {
+    if (isTRUE(input$wiz_delimiter == "other") && nzchar(input$wiz_delimiter_custom %||% ""))
+      wiz$delimiter <- input$wiz_delimiter_custom
+  })
   observeEvent(input$wiz_encoding,  { wiz$encoding   <- input$wiz_encoding })
   observeEvent(input$wiz_quote_char,{ wiz$quote_char <- input$wiz_quote_char })
   observeEvent(input$wiz_has_header,{ wiz$has_header <- isTRUE(as.logical(input$wiz_has_header)) })
@@ -385,15 +458,21 @@ server_step3_csv <- function(input, output, session, wiz, gcfg_rv) {
   observeEvent(input$step3_fwf_autodetect, {
     path <- wiz$current_preview_path
     req(nchar(path %||% "") > 0)
+    err <- NULL
     result <- tryCatch(
       readr::fwf_empty(path, skip=as.integer(input$wiz_fwf_skip %||% 0), n=100),
-      error=function(e) NULL
+      error=function(e) { err <<- conditionMessage(e); NULL }
     )
     if (!is.null(result) && nrow(result) > 1) {
       # Convert to 0-based char positions (boundary starts)
       positions <- result$begin[-1]  # skip the first (=0)
       session$sendCustomMessage("fwf_restore_boundaries", list(positions=as.list(positions)))
       showNotification(sprintf("Auto-detected %d columns — please verify.", nrow(result)), type="message")
+    } else if (!is.null(err)) {
+      # A real read/encoding error must be distinguishable from a legitimately
+      # ragged file — both used to show the same "no boundaries" message (B-12).
+      showNotification(paste("Could not analyse the file for boundaries:", err),
+                       type="error", duration=10)
     } else {
       showNotification("Auto-detection found no boundaries. Set manually using the ruler.", type="warning")
     }
@@ -577,7 +656,12 @@ server_step3_csv <- function(input, output, session, wiz, gcfg_rv) {
         skip=as.integer(wiz$fwf_skip %||% 0),
         locale=readr::locale(encoding=wiz$encoding %||% "UTF-8"))
       wiz$fwf_preview_df <- as.data.frame(df)
-    }, error=function(e) { wiz$fwf_preview_df <- NULL })
+    }, error=function(e) {
+      # Surface the parse failure inline instead of silently blanking the
+      # preview (the panel is gated on !is.null and would just vanish) — mirrors
+      # the CSV preview path so an FWF user sees why it failed (B-24).
+      wiz$fwf_preview_df <- data.frame(Error=paste("Parse failed:", conditionMessage(e)))
+    })
   })
 
   # FWF parsed preview output

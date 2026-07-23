@@ -236,6 +236,40 @@ test_that("edit wizard re-saves without corrupting the YAML", {
   expect_equal(as.integer(saved$rule_overrides$min_row_count), 5L)
 })
 
+# ── Non-standard delimiter round-trip (B-01) ─────────────────────────────────
+# Regression: a saved "Other" delimiter (outside the fixed <select> choices) used
+# to fall back to the first option (comma) on edit-reopen and be written back on
+# Save, silently corrupting the config.
+
+test_that("edit wizard preserves a non-standard 'Other' delimiter on re-save (B-01)", {
+  skip_on_cran()
+  skip_if_not_installed("shinytest2")
+  skip_if_not_installed("dqcheckr")
+
+  cfg_dir <- make_test_config_dir()
+  cfg <- make_rich_config(fixture_csv)
+  cfg$delimiter <- "~"
+  yaml::write_yaml(cfg, file.path(cfg_dir, "rich_test_ds.yml"))
+  app <- make_app_driver(cfg_dir)
+
+  open_edit(app, "rich_test_ds")
+  nav_to(app, 3)   # render the Delimiter <select> + its input observer
+
+  # The select must show "Other" and the custom box must hold the real value,
+  # not silently reset to the first (comma) option.
+  expect_equal(app$get_value(input = "wiz_delimiter"), "other")
+  expect_equal(app$get_value(input = "wiz_delimiter_custom"), "~")
+
+  wizard_go_to_step(app, 8, from_step = 3)
+  app$wait_for_js("document.getElementById('wizard_save') !== null", timeout = 5000)
+  app$click("wizard_save")
+  app$wait_for_idle(timeout = 8000)
+
+  saved <- yaml::read_yaml(file.path(cfg_dir, "rich_test_ds.yml"))
+  expect_equal(saved$delimiter, "~",
+               info = "custom delimiter must survive an edit -> re-save round-trip")
+})
+
 # ── Cross-open state isolation (0.2.1, G-03) ──────────────────────────────────
 # Editing dataset A then dataset B must not leak A's step-4 selections into B —
 # previously stale positional inputs from A's session could clobber B's state.

@@ -81,9 +81,32 @@ server_global <- function(input, output, session, rv, config_dir, gcfg_rv) {
         flag_column_order_change       = isTRUE(input$gcfg_flag_col_order)
       )
     )
+    cd <- config_dir()
+    # Ensure the config dir exists before writing or locking (first run / a
+    # DQCHECKR_CONFIG_DIR pointing at a not-yet-created dir) — otherwise the
+    # atomic write, and the lock dir created inside it, fail with an opaque
+    # "cannot open the connection" (B-18). Mirrors the wizard save handler.
+    dir.create(cd, showWarnings = FALSE, recursive = TRUE)
+
+    # Serialise the read-merge-write against concurrent same-machine saves
+    # (two tabs / two app instances on one config dir). The global config is
+    # shared by every dataset, so an unguarded read-merge-write lets the second
+    # saver silently clobber the first — the same guard the per-dataset save
+    # already uses (B-07). Released on exit.
+    lock_name <- tools::file_path_sans_ext(basename(global_config_path(cd)))
+    lock <- acquire_config_lock(cd, lock_name)
+    if (is.null(lock)) {
+      showModal(modalDialog(
+        title = "Save in progress",
+        "Another global-config save is already in progress. Wait a moment and try again.",
+        easyClose = TRUE))
+      return()
+    }
+    on.exit(unlink(lock, recursive = TRUE), add = TRUE)
+
     tryCatch({
-      merged <- update_global_config(gcfg, global_config_path(config_dir()))
-      register_all_report_paths(config_dir(), merged)
+      merged <- update_global_config(gcfg, global_config_path(cd))
+      register_all_report_paths(cd, merged)
       gcfg_rv(merged)
       showNotification("Global config saved.", type="message", duration=3)
     }, error = function(e) {

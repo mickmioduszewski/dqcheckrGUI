@@ -240,3 +240,35 @@ test_that("status_badge returns a grey badge for unknown status", {
   html_str <- as.character(status_badge("UNKNOWN"))
   expect_match(html_str, "#999999")
 })
+
+# ── Per-dataset snapshot_db resolution for drift (B-08) ───────────────────────
+# launch_drift() must resolve the snapshot DB for the specific dataset, honouring
+# a per-dataset snapshot_db override, because the ids it compares are per-file
+# autoincrement integers living in that dataset's own DB. Using the global DB
+# would compare ids that don't exist there or belong to another dataset.
+
+test_that("drift DB resolves to a per-dataset snapshot_db override, not the global one", {
+  cd <- make_test_config_dir()
+  global_db <- file.path(cd, "data", "global.sqlite")
+  ds_db     <- file.path(cd, "data", "ds_only.sqlite")
+
+  gcfg <- list(snapshot_db = global_db)
+  yaml::write_yaml(list(dataset_name = "ds_over", format = "csv", encoding = "UTF-8",
+                        delimiter = ",", current_file = "x.csv",
+                        snapshot_db = ds_db),
+                   file.path(cd, "ds_over.yml"))
+  yaml::write_yaml(list(dataset_name = "ds_plain", format = "csv", encoding = "UTF-8",
+                        delimiter = ",", current_file = "x.csv"),
+                   file.path(cd, "ds_plain.yml"))
+
+  # The exact resolution launch_drift() now performs.
+  resolve <- function(ds) effective_db_path(cd, gcfg, read_dataset_known(cd, ds)$snapshot_db)
+
+  expect_identical(normalizePath(resolve("ds_over"), mustWork = FALSE),
+                   normalizePath(ds_db,               mustWork = FALSE))
+  # A dataset with no override still resolves to the global DB.
+  expect_identical(normalizePath(resolve("ds_plain"), mustWork = FALSE),
+                   normalizePath(global_db,           mustWork = FALSE))
+  # And the two differ — the old global-only resolution would have been wrong.
+  expect_false(identical(resolve("ds_over"), resolve("ds_plain")))
+})

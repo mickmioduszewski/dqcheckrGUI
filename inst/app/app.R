@@ -85,7 +85,18 @@ shinyApp(
         ds <- rv$active_dataset
         if (!is.null(ds)) {
           cfg_path <- file.path(config_dir(), paste0(ds, ".yml"))
-          cfg <- if (safe_file_exists(cfg_path)) tryCatch(read_config(cfg_path), error=function(e) list(known=list(), extra=list())) else list(known=list(), extra=list())
+          # Read defensively via read_dataset_known() (logs the parse failure)
+          # rather than a bare swallowing tryCatch. A corrupt config must not
+          # render as a blank "unconfigured" panel the user might re-save over —
+          # surface it (B-06). NULL from a *missing* file is a genuine new
+          # dataset (no notification); NULL with the file present is corruption.
+          known <- read_dataset_known(config_dir(), ds)
+          if (is.null(known) && safe_file_exists(cfg_path)) {
+            showNotification(
+              sprintf("Config for '%s' could not be read — it may be corrupt. Showing an empty panel; do not re-save over it without checking the file.", ds),
+              type = "error", duration = 12, id = paste0("cfg_corrupt_", ds))
+          }
+          cfg <- list(known = known %||% list(), extra = list())
           gcfg <- gcfg_rv()
           db_path <- effective_db_path(config_dir(), gcfg, cfg$known$snapshot_db)
           last_runs <- read_snapshot_history(db_path, ds, n=5)
@@ -123,8 +134,7 @@ shinyApp(
       # One status query per distinct snapshot DB (not per dataset): group the
       # datasets by their effective DB path, then batch-read latest statuses.
       ds_db <- vapply(datasets, function(ds) {
-        k <- tryCatch(read_config(file.path(config_dir(), paste0(ds, ".yml")))$known,
-                      error = function(e) NULL)
+        k <- read_dataset_known(config_dir(), ds)   # logs a parse failure (B-14/B-17)
         effective_db_path(config_dir(), gcfg, k$snapshot_db)
       }, character(1))
       statuses <- character(0)

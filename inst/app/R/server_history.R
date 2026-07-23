@@ -2,6 +2,12 @@
 
 server_history <- function(input, output, session, rv, config_dir, gcfg_rv) {
 
+  # Per-drift stdout logs are tempfile()s; track and remove them on session end
+  # so they don't accumulate in tempdir() over a long-lived server process (B-11).
+  .drift_logs <- new.env(parent = emptyenv())
+  .drift_logs$paths <- character(0)
+  session$onSessionEnded(function() unlink(.drift_logs$paths))
+
   hist_data  <- reactiveVal(data.frame())
   hist_limit <- reactiveVal(50L)
 
@@ -38,6 +44,31 @@ server_history <- function(input, output, session, rv, config_dir, gcfg_rv) {
   observeEvent(input$history_load_more, {
     hist_limit(hist_limit() + 50L)
     load_history()
+  })
+
+  # Disclosure banner: the History table reads only the global snapshot DB, so a
+  # dataset with a per-dataset snapshot_db override is silently absent (B-08).
+  # Rather than merge across DBs (a behaviour change with its own edge cases),
+  # surface the omission here so it is disclosed, not hidden. Recomputes when the
+  # dataset list or global config changes. Dataset names are text children of the
+  # tags below, so htmltools escapes them — no manual escaping needed.
+  output$history_db_note <- renderUI({
+    rv$active_section
+    rv$dataset_refresh
+    off <- datasets_off_global_history(config_dir(), gcfg_rv())
+    if (length(off) == 0) return(NULL)
+    n  <- length(off)
+    is1 <- n == 1
+    div(class = "alert alert-info py-2 px-3 mb-3", style = "font-size:13px;",
+      tags$strong("Note: "),
+      sprintf(
+        "%d dataset%s use%s a separate snapshot database, so %s runs are not listed here: %s. Drift comparison for %s is unaffected.",
+        n,
+        if (is1) "" else "s",
+        if (is1) "s" else "",
+        if (is1) "its" else "their",
+        paste(off, collapse = ", "),
+        if (is1) "it" else "them"))
   })
 
   output$history_table <- DT::renderDataTable({
@@ -104,14 +135,22 @@ server_history <- function(input, output, session, rv, config_dir, gcfg_rv) {
       return(invisible(NULL))
     }
     cd         <- config_dir()
-    db_path    <- resolve_infra_path(gcfg_rv()$snapshot_db, cd,
-                                     default = "data/snapshots.sqlite", mustWork = FALSE)
+    # Resolve the snapshot DB for THIS dataset, honouring a per-dataset
+    # snapshot_db override — the snapshot ids being compared are per-file
+    # autoincrement integers that live in the dataset's own DB. Using the global
+    # DB (as every other panel does not) would compare ids that either don't
+    # exist there or belong to an unrelated dataset — a silent wrong-data drift
+    # report (B-08). compare_snapshots() reads the dataset's own config for the
+    # report dir, so only db_path needs resolving here.
+    known      <- read_dataset_known(cd, ds_name)
+    db_path    <- effective_db_path(cd, gcfg_rv(), known$snapshot_db)
     report_dir <- resolve_infra_path(gcfg_rv()$report_output_dir, cd,
                                      default = "reports/", mustWork = FALSE)
     prev_id    <- min(as.integer(c(id1, id2)))
     curr_id    <- max(as.integer(c(id1, id2)))
     showNotification("Starting drift comparison...", type = "message", duration = 4)
     drift_log           <- tempfile("dqcheckr_drift_", fileext = ".log")
+    .drift_logs$paths   <- c(.drift_logs$paths, drift_log)   # unlinked on session end (B-11)
     rv_drift$proc       <- callr::r_bg(
       func = function(dn, p, c, db, cd) {
         dqcheckr::compare_snapshots(dn,
@@ -159,14 +198,7 @@ server_history <- function(input, output, session, rv, config_dir, gcfg_rv) {
     if (is.null(proc) || proc$is_alive()) return()
 
     result <- tryCatch(proc$get_result(), error = function(e) {
-      last_line <- tryCatch({
-        lp <- rv_drift$log_path
-        if (!is.null(lp) && file.exists(lp)) {
-          lines <- readLines(lp, warn = FALSE)
-          lines <- lines[nchar(trimws(lines)) > 0]
-          if (length(lines) > 0) tail(lines, 1) else ""
-        } else ""
-      }, error = function(e2) "")
+      last_line <- tail_nonblank_log_line(rv_drift$log_path)
       msg <- if (nchar(last_line) > 0) last_line else conditionMessage(e)
       showNotification(paste("Drift comparison failed:", msg),
                        type = "error", duration = 10)
@@ -179,7 +211,13 @@ server_history <- function(input, output, session, rv, config_dir, gcfg_rv) {
     # it rather than re-deriving the filename with a slug regex (which broke when
     # the drift filename gained its snapshot ids). NULL means no report was
     # written (e.g. Quarto unavailable) -- the drift still ran.
-    url <- drift_report_url(result)
+    # Build the link with the target dataset's own report URL prefix — a
+    # per-dataset report_output_dir is served under dq_reports_<ds> (B-09).
+    drift_ds     <- rv_drift$ds_name
+    drift_prefix <- report_url_prefix(
+      drift_ds, read_dataset_known(config_dir(), drift_ds)$report_output_dir,
+      config_dir(), gcfg_rv())
+    url <- drift_report_url(result, drift_prefix)
     if (!is.null(url)) {
       showModal(modalDialog(
         title  = "Drift comparison complete",

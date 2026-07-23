@@ -3,6 +3,7 @@
 ui_history <- function() {
   tagList(
     h4("Run History", style="margin-bottom:20px;"),
+    uiOutput("history_db_note"),
     div(class="d-flex gap-2 align-items-center mb-3",
       actionButton("history_compare", "Compare drift ▶",
                    class="btn btn-outline-info btn-sm", disabled=TRUE),

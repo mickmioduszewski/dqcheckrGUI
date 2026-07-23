@@ -171,6 +171,15 @@ test_that("infer_col_type_simple still accepts genuine 8-digit %Y%m%d dates", {
                "date")
 })
 
+test_that("infer_col_type_simple classifies ISO date-time strings as date (matches dqcheckr)", {
+  # Wizard preview must agree with run-time classification: a ServiceNow-style
+  # timestamp column now folds into the date type on both sides.
+  expect_equal(infer_col_type_simple(c("2026-07-23 09:59:22","2026-07-24 10:00:00")),
+               "date")
+  expect_equal(infer_col_type_simple(c("2026-07-23T09:59:22","2026-07-24T10:00:00")),
+               "date")
+})
+
 # ── safe_file_exists / safe_dir_exists ───────────────────────────────────────
 
 test_that("safe_file_exists returns TRUE for existing file", {
@@ -487,6 +496,50 @@ test_that("effective_db_path leaves absolute paths unchanged", {
                normalizePath(abs, mustWork = FALSE))
 })
 
+# ── datasets_off_global_history (B-08 disclosure) ────────────────────────────
+
+# Write a minimal dataset config into cfg_dir; snapshot_db omitted when "".
+.write_ds_cfg <- function(cfg_dir, ds, snapshot_db = "") {
+  cfg <- list(dataset_name = ds)
+  if (nzchar(snapshot_db)) cfg$snapshot_db <- snapshot_db
+  yaml::write_yaml(cfg, file.path(cfg_dir, paste0(ds, ".yml")))
+}
+
+test_that("datasets_off_global_history returns none when all datasets use the global DB", {
+  root    <- withr::local_tempdir()
+  cfg_dir <- file.path(root, "config")
+  dir.create(cfg_dir)
+  gcfg <- list(snapshot_db = "data/global.sqlite")
+  .write_ds_cfg(cfg_dir, "alpha")                          # no override
+  .write_ds_cfg(cfg_dir, "beta", "data/global.sqlite")     # override == global
+  expect_equal(datasets_off_global_history(cfg_dir, gcfg), character(0))
+})
+
+test_that("datasets_off_global_history names only datasets on a different DB", {
+  root    <- withr::local_tempdir()
+  cfg_dir <- file.path(root, "config")
+  dir.create(cfg_dir)
+  gcfg <- list(snapshot_db = "data/global.sqlite")
+  .write_ds_cfg(cfg_dir, "alpha")                          # global — shown
+  .write_ds_cfg(cfg_dir, "gamma", "data/teamB.sqlite")     # separate — hidden
+  .write_ds_cfg(cfg_dir, "delta", "data/teamB.sqlite")     # separate — hidden
+  expect_setequal(datasets_off_global_history(cfg_dir, gcfg),
+                  c("gamma", "delta"))
+})
+
+test_that("datasets_off_global_history treats an equivalent relative/absolute path as the global DB", {
+  root    <- withr::local_tempdir()
+  cfg_dir <- file.path(root, "config")
+  dir.create(cfg_dir)
+  gcfg <- list(snapshot_db = "data/global.sqlite")
+  # Same file as the global default, written as an absolute path — must resolve
+  # equal and therefore NOT be reported as off-global.
+  abs_global <- normalizePath(file.path(root, "data", "global.sqlite"),
+                              mustWork = FALSE)
+  .write_ds_cfg(cfg_dir, "alpha", abs_global)
+  expect_equal(datasets_off_global_history(cfg_dir, gcfg), character(0))
+})
+
 # ── utc_to_local_display fallback (0.2.1, L-05) ──────────────────────────────
 
 test_that("utc_to_local_display shows unparseable timestamps as-is, not 'NA'", {
@@ -603,6 +656,15 @@ test_that("drift_report_url builds the /dq_reports/ URL from report_path", {
   expect_equal(url, "/dq_reports/drift_sales_20260718_072345_1_2.html")
 })
 
+test_that("drift_report_url uses a per-dataset report prefix when given (B-09)", {
+  f <- withr::local_tempfile(fileext = ".html")
+  writeLines("<html/>", f)
+  target <- file.path(dirname(f), "drift_sales_20260718_072345_1_2.html")
+  file.rename(f, target)
+  url <- drift_report_url(list(report_path = target), "dq_reports_sales")
+  expect_equal(url, "/dq_reports_sales/drift_sales_20260718_072345_1_2.html")
+})
+
 test_that("drift_report_url returns NULL when no report was written", {
   # report_path is NULL when report=FALSE / Quarto absent / render failed.
   expect_null(drift_report_url(list(report_path = NULL)))
@@ -635,6 +697,25 @@ test_that("report_link_cell shows 'render failed' for a failed row", {
                            "2026-07-18 01:02:03", "sales", "dq_reports")
   expect_match(cell, "render failed")
   expect_false(grepl("Open", cell))
+})
+
+test_that("report_link_cell percent-encodes an untrusted report_prefix (B-05, no XSS)", {
+  # report_prefix embeds the dataset name; a crafted name must not break out of
+  # the JS string / HTML attribute in the escape=FALSE onclick handler.
+  evil <- "dq_reports_x')//<img src=x onerror=alert(1)>"
+  cell <- report_link_cell("f_1.html", "success",
+                           "2026-07-18 01:02:03", "sales", evil)
+  # No raw quote, angle bracket, or attribute-breaking char from the prefix
+  # survives into the rendered cell — they are percent-encoded.
+  expect_false(grepl("')//", cell, fixed = TRUE))
+  expect_false(grepl("<img", cell, fixed = TRUE))
+  expect_match(cell, "dq_reports_x")   # the safe stem is still present
+})
+
+test_that("report_link_cell leaves an ordinary report_prefix verbatim", {
+  cell <- report_link_cell("f_1.html", "success",
+                           "2026-07-18 01:02:03", "sales", "dq_reports_sales")
+  expect_match(cell, "dq_reports_sales", fixed = TRUE)
 })
 
 test_that("report_link_cell reconstructs the legacy slug only for a pre-0.2.3 success/NA row", {
@@ -748,4 +829,17 @@ test_that("js_string_escape leaves an ordinary name unchanged", {
 
 test_that("js_string_escape is vectorised over multiple names", {
   expect_equal(js_string_escape(c("a'b", "c\\d")), c("a\\'b", "c\\\\d"))
+})
+
+# ── tail_nonblank_log_line (B-16) ────────────────────────────────────────────
+test_that("tail_nonblank_log_line returns the last non-blank line, else ''", {
+  f <- withr::local_tempfile(fileext = ".log")
+  writeLines(c("starting", "  ", "processing rows", "", "Error: boom", "   "), f)
+  expect_equal(tail_nonblank_log_line(f), "Error: boom")
+
+  empty <- withr::local_tempfile(fileext = ".log"); file.create(empty)
+  expect_equal(tail_nonblank_log_line(empty), "")
+
+  expect_equal(tail_nonblank_log_line(NULL), "")
+  expect_equal(tail_nonblank_log_line("/no/such/file.log"), "")
 })

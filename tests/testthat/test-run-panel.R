@@ -95,3 +95,76 @@ test_that("run panel precheck flags an invalid config before launch (B-19)", {
   expect_match(precheck, "Issues found")
   expect_match(precheck, "Current file not found")
 })
+
+# ── Precheck: remaining issue branches (B-22) ────────────────────────────────
+# The existing tests drive only "Current file not found". Cover the parse-error,
+# folder-not-found, and snapshot-db-dir-not-found branches so a regression that
+# disables any one guard is caught.
+
+test_that("run precheck surfaces parse / folder / snapshot-db-dir problems (B-22)", {
+  skip_on_cran()
+  skip_if_not_installed("shinytest2")
+  skip_if_not_installed("dqcheckr")
+
+  proj <- make_run_project()
+  cfg  <- proj$config_dir
+
+  # Parse error: invalid YAML.
+  writeLines(c("dataset_name: parse_bad", "column_rules: [unterminated"),
+             file.path(cfg, "parse_bad.yml"))
+  # Folder mode pointing at a non-existent folder.
+  yaml::write_yaml(list(dataset_name = "folder_bad", format = "csv",
+                        encoding = "UTF-8", delimiter = ",",
+                        folder = file.path(tempdir(), "no_such_folder_b22")),
+                   file.path(cfg, "folder_bad.yml"))
+  # Snapshot DB whose parent directory does not exist.
+  yaml::write_yaml(list(dataset_name = "dbdir_bad", format = "csv",
+                        encoding = "UTF-8", delimiter = ",",
+                        current_file = fixture_csv,
+                        snapshot_db = file.path(tempdir(), "no_such_dir_b22", "s.sqlite")),
+                   file.path(cfg, "dbdir_bad.yml"))
+
+  app <- make_app_driver(cfg)
+  app$run_js("Shiny.setInputValue('nav_run', 1, {priority:'event'});")
+  app$wait_for_idle(timeout = 5000)
+
+  read_precheck <- function(ds) {
+    app$set_inputs(run_dataset = ds, wait_ = FALSE)
+    app$wait_for_idle(timeout = 5000)
+    app$get_html("#run_precheck_status") %||% ""
+  }
+  expect_match(read_precheck("parse_bad"),  "could not be parsed", ignore.case = TRUE)
+  expect_match(read_precheck("folder_bad"), "Folder not found")
+  expect_match(read_precheck("dbdir_bad"),  "Snapshot DB directory not found")
+})
+
+# ── Runtime failure after a passing precheck (B-23) ──────────────────────────
+# finish_completed_run()'s crash-recovery branch (proc$get_result() throwing)
+# was untested: every prior test either succeeds or is stopped by the user.
+
+test_that("run panel reports a runtime failure that passes precheck (B-23)", {
+  skip_on_cran()
+  skip_if_not_installed("shinytest2")
+  skip_if_not_installed("dqcheckr")
+
+  proj <- make_run_project()
+  # FWF config with an existing current_file but no fwf_widths: precheck passes
+  # (the file exists), but dqcheckr::run_dq_check() aborts (dqcheckr_invalid_config)
+  # once it actually tries to read the file — exercising the error path.
+  yaml::write_yaml(list(dataset_name = "bad_fwf", format = "fwf",
+                        encoding = "UTF-8", current_file = fixture_csv),
+                   file.path(proj$config_dir, "bad_fwf.yml"))
+
+  app <- make_app_driver(proj$config_dir)
+  app$run_js("Shiny.setInputValue('nav_run', 1, {priority:'event'});")
+  app$wait_for_idle(timeout = 5000)
+  app$set_inputs(run_dataset = "bad_fwf", wait_ = FALSE)
+  app$wait_for_idle(timeout = 5000)
+
+  # Precheck passes (file exists) — the failure only surfaces at run time.
+  expect_match(app$get_html("#run_precheck_status"), "Configuration looks good")
+
+  app$click("run_start")
+  status <- wait_for_run_status(app)
+  expect_match(status, "Run failed")
+})

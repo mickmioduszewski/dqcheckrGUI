@@ -89,3 +89,32 @@ test_that("sniff_file_encoding() never returns an NA top for a stray high byte (
   expect_true(nzchar(s$top))
   unlink(path)
 })
+
+# ── Chunked streaming: boundary correctness (B-10) ────────────────────────────
+# sniff_file_encoding() streams the file in bounded chunks so a multi-GB file is
+# not read into one raw vector. A multi-byte UTF-8 sequence split across a chunk
+# boundary must be carried over, not false-flagged as invalid.
+
+test_that("sniff_file_encoding() validates a multi-byte char split across a chunk boundary (B-10)", {
+  # "aaa" + ë (0xC3 0xAB). chunk_size = 4 puts the ë lead byte at the end of
+  # chunk 1 and its continuation byte in chunk 2.
+  path <- tempfile(fileext = ".csv")
+  con  <- file(path, open = "wb")
+  writeBin(c(charToRaw("aaa"), as.raw(c(0xC3, 0xAB))), con)
+  close(con)
+  s <- sniff_file_encoding(path, chunk_size = 4L)
+  expect_true(s$certain)
+  expect_equal(s$top, "UTF-8")
+  unlink(path)
+})
+
+test_that("sniff_file_encoding() still flags invalid bytes under a tiny chunk_size (B-10)", {
+  path <- tempfile(fileext = ".csv")
+  con  <- file(path, open = "wb")
+  writeBin(c(charToRaw("Mick,Sydney"), as.raw(0xFF)), con)   # lone high byte: not UTF-8
+  close(con)
+  s <- sniff_file_encoding(path, chunk_size = 4L)
+  expect_false(s$certain)
+  expect_false(is.na(s$top))
+  unlink(path)
+})

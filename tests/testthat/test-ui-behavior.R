@@ -326,3 +326,29 @@ test_that("dataset panel Compare drift button is disabled before checkboxes are 
   expect_true(isTRUE(disabled),
               info = "compare_drift button must carry the disabled attribute on load")
 })
+
+# ── Corrupt per-dataset config surfaced, not swallowed (B-06) ─────────────────
+# Regression: the dataset panel read the config via a bare swallowing tryCatch,
+# so a corrupt YAML rendered as a blank "unconfigured" panel with no trace and
+# no warning — the user could re-save over it. It now routes through
+# read_dataset_known() and notifies when the file exists but cannot be parsed.
+
+test_that("selecting a dataset with a corrupt config shows an error, not a blank panel (B-06)", {
+  skip_on_cran()
+  skip_if_not_installed("shinytest2")
+  skip_if_not_installed("dqcheckr")
+
+  cfg_dir <- make_test_config_dir()
+  # Syntactically invalid YAML: read_config() -> yaml::read_yaml() errors.
+  writeLines(c("dataset_name: broken_ds", "column_rules: [unterminated"),
+             file.path(cfg_dir, "broken_ds.yml"))
+  app <- make_app_driver(cfg_dir)
+
+  app$run_js("Shiny.setInputValue('sidebar_dataset_click','broken_ds',{priority:'event'});")
+  app$wait_for_idle(timeout = 5000)
+
+  notif <- app$get_html("#shiny-notification-panel") %||% ""
+  expect_match(notif, "could not be read", ignore.case = TRUE)
+  # The app must still be alive (no crash) — the panel heading rendered.
+  expect_no_error(app$get_html("body"))
+})

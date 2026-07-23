@@ -15,12 +15,17 @@ make_report_filename <- function(dataset_name, run_timestamp) {
 # filename gained its snapshot ids. Returns NULL when no report was written
 # (report_path NULL, or the file is not on disk), so the caller can show a
 # "no report" message instead of a dead link.
-drift_report_url <- function(drift_result) {
+drift_report_url <- function(drift_result, report_prefix = "dq_reports") {
   rp <- drift_result$report_path
   if (is.null(rp) || length(rp) != 1 || is.na(rp) || !nzchar(rp) ||
       !file.exists(rp))
     return(NULL)
-  paste0("/dq_reports/", basename(rp))
+  # A dataset with a per-dataset report_output_dir renders its drift report into
+  # that dir, served under "dq_reports_<ds>" — not the global "dq_reports". A
+  # hardcoded /dq_reports/ prefix 404s for those datasets (B-09). Percent-encode
+  # both segments (dataset-derived, untrusted) as report_link_cell() does.
+  paste0("/", url_encode_filename(report_prefix), "/",
+         url_encode_filename(basename(rp)))
 }
 
 # The Report-column cell (HTML) for the dataset panel's recent-runs table.
@@ -44,7 +49,12 @@ report_link_cell <- function(report_file, render_status, run_timestamp,
   ifelse(linkable,
     sprintf(
       '<a href="javascript:void(0)" onclick="window.open(\'/%s/%s\',\'_blank\')">Open</a>',
-      report_prefix, url_encode_filename(filename)),
+      # report_prefix embeds the dataset name (dq_reports_<ds>), which is
+      # untrusted (config filename / snapshots DB). It sits in a JS string
+      # inside an escape=FALSE HTML attribute, so it must be percent-encoded
+      # exactly like filename — HTML-entity escaping alone would be decoded back
+      # to a quote before the JS parses and still break out (stored XSS, B-05).
+      url_encode_filename(report_prefix), url_encode_filename(filename)),
     ifelse(pending,
       '<span class="text-muted fst-italic">rendering…</span>',
       '<span class="text-muted fst-italic">render failed</span>'))
@@ -143,6 +153,20 @@ list_files_only <- function(path) {
   files[!dir.exists(files)]
 }
 
+# Last non-blank line of a background-process log, for surfacing the real cause
+# of a failed run/drift (usually more informative than the R condition message).
+# Returns "" when the log is missing, empty, or unreadable. Shared by the run
+# panel and the drift poller, which otherwise carried a verbatim copy each (B-16).
+tail_nonblank_log_line <- function(log_path) {
+  tryCatch({
+    if (!is.null(log_path) && file.exists(log_path)) {
+      lines <- readLines(log_path, warn = FALSE)
+      lines <- lines[nchar(trimws(lines)) > 0]
+      if (length(lines) > 0) tail(lines, 1) else ""
+    } else ""
+  }, error = function(e) "")
+}
+
 # Effective snapshot DB path for a dataset: per-dataset override, then the
 # global config, then the standard default — always resolved against the
 # deployment root. Raw relative paths (e.g. the "data/snapshots.sqlite" the
@@ -151,6 +175,25 @@ list_files_only <- function(path) {
 effective_db_path <- function(config_dir, gcfg, ds_snapshot_db = NULL) {
   resolve_infra_path(ds_snapshot_db %||% gcfg$snapshot_db, config_dir,
                      default = "data/snapshots.sqlite", mustWork = FALSE)
+}
+
+# Datasets whose runs are written to a snapshot DB other than the global one.
+# The History panel reads only the global DB (load_history), so these datasets'
+# runs are absent from that table — a known limitation of the single-DB history
+# reader (B-08). Their drift comparisons are unaffected: launch_drift resolves
+# the per-dataset DB. Returned names drive a disclosure banner so the omission is
+# visible rather than silent. Compares resolved paths (both go through
+# resolve_infra_path -> normalizePath), so a per-dataset snapshot_db that points
+# back at the global file correctly counts as "shown here".
+datasets_off_global_history <- function(config_dir, gcfg) {
+  global_db <- effective_db_path(config_dir, gcfg, NULL)
+  off <- character(0)
+  for (ds in list_dataset_configs(config_dir)) {
+    ds_db <- effective_db_path(config_dir, gcfg,
+                               read_dataset_known(config_dir, ds)$snapshot_db)
+    if (!identical(ds_db, global_db)) off <- c(off, ds)
+  }
+  off
 }
 
 .status_cfg <- function(status) {
@@ -343,10 +386,13 @@ infer_col_type_simple <- function(x, threshold = 0.90) {
   # as dates. Requiring the whole string to match the format's shape first closes
   # that, so the wizard preview agrees with run-time classification. Keep the
   # formats/shapes in sync with dqcheckr::infer_col_type.
-  date_fmts   <- c("%Y-%m-%d","%d/%m/%Y","%m/%d/%Y","%Y%m%d","%d-%m-%Y")
+  date_fmts   <- c("%Y-%m-%d","%d/%m/%Y","%m/%d/%Y","%Y%m%d","%d-%m-%Y",
+                   "%Y-%m-%d %H:%M:%S","%Y-%m-%dT%H:%M:%S")
   date_shapes <- c("^[0-9]{4}-[0-9]{2}-[0-9]{2}$", "^[0-9]{2}/[0-9]{2}/[0-9]{4}$",
                    "^[0-9]{2}/[0-9]{2}/[0-9]{4}$", "^[0-9]{8}$",
-                   "^[0-9]{2}-[0-9]{2}-[0-9]{4}$")
+                   "^[0-9]{2}-[0-9]{2}-[0-9]{4}$",
+                   "^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$",
+                   "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$")
   for (i in seq_along(date_fmts)) {
     if (!all(grepl(date_shapes[[i]], x))) next
     parsed <- suppressWarnings(as.Date(x, format=date_fmts[[i]]))

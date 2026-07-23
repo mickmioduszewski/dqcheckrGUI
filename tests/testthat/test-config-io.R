@@ -164,6 +164,28 @@ test_that("build_config_list omits expected_columns and key_columns when empty",
   expect_null(cfg$key_columns)
 })
 
+# ── build_config_list: standalone csv_skip (B-03) ────────────────────────────
+# A csv_skip with no col_names (skip preamble rows, then auto-detect the header)
+# used to be dropped on resave because both header branches only emit csv_skip
+# alongside col_names.
+
+test_that("build_config_list preserves a standalone csv_skip with no col_names (B-03)", {
+  wiz <- make_wiz(has_header = TRUE, csv_skip = 2L, col_names = character(0),
+                  raw_header_names = character(0))
+  cfg <- build_config_list(wiz)
+
+  expect_equal(as.integer(cfg$csv_skip), 2L)
+  expect_null(cfg$col_names)
+})
+
+test_that("build_config_list omits csv_skip for a clean header (no preamble)", {
+  wiz <- make_wiz(has_header = TRUE, csv_skip = 0L, col_names = character(0),
+                  raw_header_names = character(0))
+  cfg <- build_config_list(wiz)
+
+  expect_null(cfg$csv_skip)
+})
+
 test_that("build_config_list writes column_types overrides", {
   wiz <- make_wiz(col_types_override = list(code = "character", amount = "numeric"))
   cfg <- build_config_list(wiz)
@@ -538,4 +560,21 @@ test_that("default_global_config is the single source both callers share (B-22)"
     "max_missing_rate_change_pp", "max_non_numeric_rate_change_pp",
     "flag_new_columns", "flag_dropped_columns", "flag_type_changes",
     "flag_column_order_change"))
+})
+
+# ── quote_char round-trip guard (B-21) ───────────────────────────────────────
+test_that("build_config_list emits a non-default quote_char and omits the default (B-21)", {
+  expect_equal(build_config_list(make_wiz(quote_char = "'"))$quote_char, "'")
+  expect_null(build_config_list(make_wiz(quote_char = '"'))$quote_char)
+})
+
+# ── write_yaml_atomic fallback-failure guard (B-25) ──────────────────────────
+test_that("write_yaml_atomic aborts when both rename and copy fail (B-25)", {
+  f <- withr::local_tempfile(fileext = ".yml")
+  testthat::local_mocked_bindings(
+    file.rename = function(from, to) FALSE,
+    file.copy   = function(from, to, ...) FALSE,
+    .package = "base"
+  )
+  expect_error(write_yaml_atomic(list(a = 1), f), regexp = "Could not write config")
 })

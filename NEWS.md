@@ -1,5 +1,15 @@
 # dqcheckrGUI (development version)
 
+## Improvements
+
+* The History panel now discloses when it is not showing everything. The table
+  reads only the global snapshot database, so runs from a dataset that overrides
+  `snapshot_db` at the dataset level were silently absent. A note above the table
+  now names any such datasets when they are present, so the omission is visible
+  rather than hidden. (Drift comparison already reads each dataset's own
+  database and is unaffected. Merging histories across databases remains a known
+  limitation — see the "Browsing history" section of the vignette.)
+
 ## Bug fixes
 
 * The drift-comparison report link now works again. The GUI located the rendered

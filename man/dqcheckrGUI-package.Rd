@@ -23,6 +23,14 @@ walkthrough including Windows and OneDrive setups:
 \code{vignette("dqcheckrGUI", package = "dqcheckrGUI")}.
 }
 
+\section{Status}{
+
+\pkg{dqcheckrGUI} is feature-complete and is maintained for corrections
+only.  Configuration features are developed in \pkg{dqcheckr} itself, which
+offers a script-based workflow that does not need this interface.  Existing
+deployments continue to work unchanged.
+}
+
 \section{Related packages}{
 
 \pkg{dqcheckrGUI} delegates all data processing to \pkg{dqcheckr}.

@@ -7,6 +7,13 @@ quality checks for recurring dataset deliveries.
 Use this if you want to configure and run quality checks without writing any R
 code. If you prefer scripting, use `dqcheckr` directly.
 
+## Status: maintenance mode
+
+`dqcheckrGUI` is feature-complete. It receives bug fixes and compatibility
+updates only — configuration features are developed in `dqcheckr` itself, which
+offers a script-based workflow that does not need this interface. Existing
+deployments continue to work unchanged.
+
 ## What it does
 
 - Walks you through setting up quality checks for a new dataset (wizard)

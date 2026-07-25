@@ -19,6 +19,11 @@ and browse historical results — without writing any R code.
 The app runs entirely on your local machine. No internet connection, no server,
 and no cloud services are required.
 
+`dqcheckrGUI` is feature-complete and is maintained for corrections only.
+Configuration features are developed in `dqcheckr` itself, which offers a
+script-based workflow that does not need this interface. Existing deployments
+continue to work unchanged.
+
 ## Prerequisites
 
 Install `dqcheckr` before installing `dqcheckrGUI`:

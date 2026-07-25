@@ -1,4 +1,13 @@
-# dqcheckrGUI (development version)
+# dqcheckrGUI 0.2.2
+
+This is the feature-complete release: `dqcheckrGUI` now enters **maintenance
+mode** and will receive bug fixes and compatibility updates only.
+Configuration features are developed in `dqcheckr` itself, which offers a
+script-based workflow that does not need this interface. Existing deployments
+continue to work unchanged.
+
+Version 0.2.1 was developed but never published to CRAN, so upgrading from the
+published 0.2.0 brings the changes listed under both headings below.
 
 ## Improvements
 
@@ -58,10 +67,6 @@
 * Hardened the observers behind client-settable inputs so a malformed payload
   can no longer error them, and added test coverage for the run panel, the
   global-config reader, and the dataset-name JavaScript escaper.
-
-# dqcheckrGUI 0.2.2
-
-## Bug fixes
 
 * The step-3 encoding sniffer no longer writes `encoding: ASCII` into dataset
   configs. `readr::guess_encoding()`'s head sample confidently reports

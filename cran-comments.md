@@ -1,37 +1,33 @@
-# CRAN submission comments — dqcheckrGUI 0.2.1
+# CRAN submission comments — dqcheckrGUI 0.2.2
 
 ## R CMD check results
 
-0 errors | 0 warnings | 2 notes
+0 errors | 0 warnings | 1 note
 
-This is a bug-fix update (v0.2.1) of a package currently on CRAN as v0.2.0.
+This is a bug-fix and robustness update of a package currently on CRAN as
+v0.2.0. Versions 0.2.1 and 0.2.2 were developed in sequence but only this
+one is submitted, so it carries every change since 0.2.0.
+
+It is also the package's feature-complete release: dqcheckrGUI now enters
+maintenance mode and will receive bug fixes and compatibility updates only.
+This is stated in the Description, the README, the package help page and
+NEWS.md. Configuration features are developed in 'dqcheckr' itself, which
+offers a script-based workflow that does not need this interface.
 
 ## Test environments
 
-* macOS Tahoe 26.5.1 / aarch64-apple-darwin23, R 4.6.0 (2026-04-24), checked
-  via `rcmdcheck::rcmdcheck(<pkg dir>, args = "--as-cran")` (local,
-  2026-07-04): 0 errors | 0 warnings | 2 notes
-* win-builder: R-devel (submitted 2026-07-04): results awaited
-* win-builder: R-release (submitted 2026-07-04): results awaited
+* macOS Tahoe 26.5.1 / aarch64-apple-darwin23, R 4.6.0, checked via
+  `R CMD check --as-cran` on the built tarball (local, 2026-07-25):
+  0 errors | 0 warnings | 1 note
+* win-builder: R-devel (submitted 2026-07-__): results awaited
+* win-builder: R-release (submitted 2026-07-__): results awaited
+
+Checked against 'dqcheckr' 0.2.5 as published on CRAN (installed into a
+separate library for the purpose), not a development build.
 
 ## Notes
 
-### NOTE 1: Days since last update (expected on all platforms)
-
-```
-Maintainer: 'Mick Mioduszewski <mick@mioduszewski.net>'
-Days since last update: 5
-```
-
-Informational. 0.2.1 is a focused bug-fix release following an internal
-quality review of 0.2.0: it fixes broken run-history displays for projects
-created by the app's own first-run scaffold (relative `snapshot_db` paths
-never resolved), adds HTML escaping for externally supplied file names
-rendered in tables, stops the Global Config editor discarding hand-added
-YAML keys, and closes wizard state-leak and rename-overwrite bugs. These
-are user-facing defects worth shipping promptly rather than holding.
-
-### NOTE 2: Skipping HTML validation (local only)
+### NOTE 1: Skipping HTML validation (local only)
 
 ```
 Skipping checking HTML validation: 'tidy' doesn't look like recent enough HTML Tidy.
@@ -53,9 +49,12 @@ appear on CRAN's check servers, which run a current version of 'HTML Tidy'.
   is demonstrably used and no "Namespaces in Imports field not imported
   from" NOTE is raised.
 * All 'shinytest2' app-driver tests are `skip_on_cran()` (they require a
-  browser); the remaining unit suite runs in seconds.
-* Works with the dqcheckr currently on CRAN (0.2.2); also tested against
-  the upcoming dqcheckr 0.2.3 submission.
+  browser); the remaining unit suite runs in seconds. The full suite,
+  including the app-driver tests, was run locally for this submission:
+  512 passing, 0 failures.
+* 'quarto' is newly declared in `Suggests`: one test helper probes for a
+  Quarto installation via `requireNamespace("quarto")` before rendering a
+  report, and skips when it is absent.
 
 ## Downstream dependencies
 

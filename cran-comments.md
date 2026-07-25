@@ -19,8 +19,11 @@ offers a script-based workflow that does not need this interface.
 * macOS Tahoe 26.5.1 / aarch64-apple-darwin23, R 4.6.0, checked via
   `R CMD check --as-cran` on the built tarball (local, 2026-07-25):
   0 errors | 0 warnings | 1 note
-* win-builder: R-devel (submitted 2026-07-25): results awaited
-* win-builder: R-release (submitted 2026-07-25): results awaited
+* win-builder: R-devel (R Under development (unstable) (2026-07-24 r90297 ucrt),
+  x86_64-w64-mingw32, Windows Server 2022, 2026-07-25): Status OK —
+  0 errors | 0 warnings | 0 notes
+* win-builder: R-release (R 4.6.1, x86_64-w64-mingw32, Windows Server 2022,
+  2026-07-25): Status OK — 0 errors | 0 warnings | 0 notes
 
 Checked against 'dqcheckr' 0.2.5 as published on CRAN (installed into a
 separate library for the purpose), not a development build.

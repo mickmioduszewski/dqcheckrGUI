@@ -18,6 +18,13 @@ See the getting-started vignette for a full walkthrough including
 Windows and OneDrive setups:
 [`vignette("dqcheckrGUI", package = "dqcheckrGUI")`](https://mickmioduszewski.github.io/dqcheckrGUI/articles/dqcheckrGUI.md).
 
+## Status
+
+dqcheckrGUI is feature-complete and is maintained for corrections only.
+Configuration features are developed in dqcheckr itself, which offers a
+script-based workflow that does not need this interface. Existing
+deployments continue to work unchanged.
+
 ## Related packages
 
 dqcheckrGUI delegates all data processing to dqcheckr. See

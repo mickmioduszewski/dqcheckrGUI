@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">dqcheckrGUI</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.2.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -33,9 +33,15 @@
     </div>
 
     <div class="section level2">
-<h2 class="pkg-version" data-toc-text="development version" id="dqcheckrgui-development-version">dqcheckrGUI (development version)<a class="anchor" aria-label="anchor" href="#dqcheckrgui-development-version"></a></h2>
+<h2 class="pkg-version" data-toc-text="0.2.2" id="dqcheckrgui-022">dqcheckrGUI 0.2.2<a class="anchor" aria-label="anchor" href="#dqcheckrgui-022"></a></h2>
+<p>This is the feature-complete release: <code>dqcheckrGUI</code> now enters <strong>maintenance mode</strong> and will receive bug fixes and compatibility updates only. Configuration features are developed in <code>dqcheckr</code> itself, which offers a script-based workflow that does not need this interface. Existing deployments continue to work unchanged.</p>
+<p>Version 0.2.1 was developed but never published to CRAN, so upgrading from the published 0.2.0 brings the changes listed under both headings below.</p>
 <div class="section level3">
-<h3 id="bug-fixes-development-version">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-development-version"></a></h3>
+<h3 id="improvements-0-2-2">Improvements<a class="anchor" aria-label="anchor" href="#improvements-0-2-2"></a></h3>
+<ul><li>The History panel now discloses when it is not showing everything. The table reads only the global snapshot database, so runs from a dataset that overrides <code>snapshot_db</code> at the dataset level were silently absent. A note above the table now names any such datasets when they are present, so the omission is visible rather than hidden. (Drift comparison already reads each dataset’s own database and is unaffected. Merging histories across databases remains a known limitation — see the “Browsing history” section of the vignette.)</li>
+</ul></div>
+<div class="section level3">
+<h3 id="bug-fixes-0-2-2">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-0-2-2"></a></h3>
 <ul><li><p>The drift-comparison report link now works again. The GUI located the rendered drift report by reconstructing its filename with a fixed pattern, which stopped matching once dqcheckr’s drift filenames gained a snapshot-id suffix — so every drift comparison reported “report not found” even though it rendered. The GUI now uses the report path <code>compare_snapshots()</code> returns directly (requires dqcheckr &gt;= 0.2.5 behaviour), removing the fragile filename contract.</p></li>
 <li><p>Report links in the dataset panel now account for a report that is still rendering. A snapshot whose <code>render_status</code> is <code>"pending"</code> (dqcheckr 0.2.5+) no longer gets a clickable “Open” link to a file that is not yet on disk; it shows “rendering…” until the report is written. A filename is only reconstructed for a genuine pre-0.2.3 row, not whenever one is absent.</p></li>
 <li><p>The <code>dqcheckr</code> dependency floor was raised to the version whose behaviour the report and drift link builders rely on.</p></li>
@@ -45,14 +51,8 @@
 <li><p>Background-process races were fixed. Clicking Stop on a run that finished in the same instant now reports its real PASS/WARN/FAIL result instead of “stopped”, and a second drift comparison launched while one is still running is refused rather than orphaning the first.</p></li>
 <li><p>A renamed-header CSV config no longer loses its <code>col_names</code>/<code>csv_skip</code> when edited and saved without re-visiting the structure step, and the step-3 encoding sniffer no longer crashes on a large, mostly-ASCII file whose charset detector returns an indeterminate result.</p></li>
 <li><p>Hardened the observers behind client-settable inputs so a malformed payload can no longer error them, and added test coverage for the run panel, the global-config reader, and the dataset-name JavaScript escaper.</p></li>
-</ul></div>
-</div>
-    <div class="section level2">
-<h2 class="pkg-version" data-toc-text="0.2.2" id="dqcheckrgui-022">dqcheckrGUI 0.2.2<a class="anchor" aria-label="anchor" href="#dqcheckrgui-022"></a></h2>
-<div class="section level3">
-<h3 id="bug-fixes-0-2-2">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-0-2-2"></a></h3>
-<ul><li>The step-3 encoding sniffer no longer writes <code>encoding: ASCII</code> into dataset configs. <code><a href="https://readr.tidyverse.org/reference/encoding.html" class="external-link">readr::guess_encoding()</a></code>’s head sample confidently reports “ASCII” whenever the first accented byte sits beyond the sample — and that config value later hard-crashed the run’s R subprocess (“Invalid multibyte sequence” inside vroom/iconv) once a delivery contained non-ASCII bytes. Step 3 now scans the <em>entire</em> file: valid UTF-8 (which includes pure ASCII) is applied as <code>UTF-8</code> with certainty; only when the file is genuinely not UTF-8 does the statistical detector run — seeded with a chunk that actually contains the non-ASCII bytes — and its legacy-encoding candidates go through the usual confirm flow. New dependency: <code>stringi</code>.</li>
-<li>An <code>encoding: ASCII</code> in an existing config (written by hand or by an older GUI) is normalised to <code>UTF-8</code> when the config is read, so editing and re-saving a dataset upgrades it. ASCII is a strict subset of UTF-8, so the change is lossless.</li>
+<li><p>The step-3 encoding sniffer no longer writes <code>encoding: ASCII</code> into dataset configs. <code><a href="https://readr.tidyverse.org/reference/encoding.html" class="external-link">readr::guess_encoding()</a></code>’s head sample confidently reports “ASCII” whenever the first accented byte sits beyond the sample — and that config value later hard-crashed the run’s R subprocess (“Invalid multibyte sequence” inside vroom/iconv) once a delivery contained non-ASCII bytes. Step 3 now scans the <em>entire</em> file: valid UTF-8 (which includes pure ASCII) is applied as <code>UTF-8</code> with certainty; only when the file is genuinely not UTF-8 does the statistical detector run — seeded with a chunk that actually contains the non-ASCII bytes — and its legacy-encoding candidates go through the usual confirm flow. New dependency: <code>stringi</code>.</p></li>
+<li><p>An <code>encoding: ASCII</code> in an existing config (written by hand or by an older GUI) is normalised to <code>UTF-8</code> when the config is read, so editing and re-saving a dataset upgrades it. ASCII is a strict subset of UTF-8, so the change is lossless.</p></li>
 </ul></div>
 </div>
     <div class="section level2">

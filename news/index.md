@@ -1,6 +1,27 @@
 # Changelog
 
-## dqcheckrGUI (development version)
+## dqcheckrGUI 0.2.2
+
+This is the feature-complete release: `dqcheckrGUI` now enters
+**maintenance mode** and will receive bug fixes and compatibility
+updates only. Configuration features are developed in `dqcheckr` itself,
+which offers a script-based workflow that does not need this interface.
+Existing deployments continue to work unchanged.
+
+Version 0.2.1 was developed but never published to CRAN, so upgrading
+from the published 0.2.0 brings the changes listed under both headings
+below.
+
+### Improvements
+
+- The History panel now discloses when it is not showing everything. The
+  table reads only the global snapshot database, so runs from a dataset
+  that overrides `snapshot_db` at the dataset level were silently
+  absent. A note above the table now names any such datasets when they
+  are present, so the omission is visible rather than hidden. (Drift
+  comparison already reads each dataset’s own database and is
+  unaffected. Merging histories across databases remains a known
+  limitation — see the “Browsing history” section of the vignette.)
 
 ### Bug fixes
 
@@ -55,10 +76,6 @@
   panel, the global-config reader, and the dataset-name JavaScript
   escaper.
 
-## dqcheckrGUI 0.2.2
-
-### Bug fixes
-
 - The step-3 encoding sniffer no longer writes `encoding: ASCII` into
   dataset configs.
   [`readr::guess_encoding()`](https://readr.tidyverse.org/reference/encoding.html)’s
@@ -72,6 +89,7 @@
   actually contains the non-ASCII bytes — and its legacy-encoding
   candidates go through the usual confirm flow. New dependency:
   `stringi`.
+
 - An `encoding: ASCII` in an existing config (written by hand or by an
   older GUI) is normalised to `UTF-8` when the config is read, so
   editing and re-saving a dataset upgrades it. ASCII is a strict subset

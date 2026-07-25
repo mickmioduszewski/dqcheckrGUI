@@ -20,7 +20,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">dqcheckrGUI</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.2.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -65,6 +65,11 @@ file deliveries, and browse historical results — without writing any R
 code.</p>
 <p>The app runs entirely on your local machine. No internet connection,
 no server, and no cloud services are required.</p>
+<p><code>dqcheckrGUI</code> is feature-complete and is maintained for
+corrections only. Configuration features are developed in
+<code>dqcheckr</code> itself, which offers a script-based workflow that
+does not need this interface. Existing deployments continue to work
+unchanged.</p>
 <div class="section level2">
 <h2 id="prerequisites">Prerequisites<a class="anchor" aria-label="anchor" href="#prerequisites"></a>
 </h2>
@@ -590,6 +595,13 @@ dataset</strong>.</li>
 <p>The drift report opens in a new tab, showing column-by-column changes
 between the two snapshots. The button is disabled with a tooltip if the
 selected rows are from different datasets.</p>
+<p><strong>Known limitation — per-dataset snapshot databases.</strong>
+The History table reads the <em>global</em> snapshot database only. If a
+dataset overrides <code>snapshot_db</code> at the dataset level (writing
+its runs to a different SQLite file), those runs are not listed in this
+table. When that is the case the panel shows a note naming the affected
+datasets, so the omission is visible. Drift comparison for those
+datasets is unaffected — it reads each dataset’s own database.</p>
 <hr>
 </div>
 <div class="section level2">

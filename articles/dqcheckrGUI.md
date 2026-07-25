@@ -8,6 +8,11 @@ deliveries, and browse historical results — without writing any R code.
 The app runs entirely on your local machine. No internet connection, no
 server, and no cloud services are required.
 
+`dqcheckrGUI` is feature-complete and is maintained for corrections
+only. Configuration features are developed in `dqcheckr` itself, which
+offers a script-based workflow that does not need this interface.
+Existing deployments continue to work unchanged.
+
 ## Prerequisites
 
 Install `dqcheckr` before installing `dqcheckrGUI`:
@@ -407,6 +412,14 @@ open that run’s HTML report in a new browser tab.
 The drift report opens in a new tab, showing column-by-column changes
 between the two snapshots. The button is disabled with a tooltip if the
 selected rows are from different datasets.
+
+**Known limitation — per-dataset snapshot databases.** The History table
+reads the *global* snapshot database only. If a dataset overrides
+`snapshot_db` at the dataset level (writing its runs to a different
+SQLite file), those runs are not listed in this table. When that is the
+case the panel shows a note naming the affected datasets, so the
+omission is visible. Drift comparison for those datasets is unaffected —
+it reads each dataset’s own database.
 
 ------------------------------------------------------------------------
 

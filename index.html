@@ -11,8 +11,8 @@
 <script src="deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="dqcheckrGUI — Point-and-Click GUI for dqcheckr">
-<meta name="description" content="A graphical user interface for the dqcheckr package. Provides a point-and-click shiny application for configuring dataset quality checks, running them against recurring file deliveries, and browsing historical check results — without writing any R code.">
-<meta property="og:description" content="A graphical user interface for the dqcheckr package. Provides a point-and-click shiny application for configuring dataset quality checks, running them against recurring file deliveries, and browsing historical check results — without writing any R code.">
+<meta name="description" content="A graphical user interface for the dqcheckr package. Provides a point-and-click shiny application for configuring dataset quality checks, running them against recurring file deliveries, and browsing historical check results — without writing any R code. The package is feature-complete and is now maintained for corrections only; configuration features are developed in dqcheckr itself, which offers a script-based workflow that does not need this interface.">
+<meta property="og:description" content="A graphical user interface for the dqcheckr package. Provides a point-and-click shiny application for configuring dataset quality checks, running them against recurring file deliveries, and browsing historical check results — without writing any R code. The package is feature-complete and is now maintained for corrections only; configuration features are developed in dqcheckr itself, which offers a script-based workflow that does not need this interface.">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -22,7 +22,7 @@
 
     <a class="navbar-brand me-2" href="index.html">dqcheckrGUI</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.2.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -51,6 +51,11 @@
 </h1></div>
 <p>A point-and-click Shiny interface for <a href="https://github.com/mickmioduszewski/dqcheckr" class="external-link">dqcheckr</a> — automated data quality checks for recurring dataset deliveries.</p>
 <p>Use this if you want to configure and run quality checks without writing any R code. If you prefer scripting, use <code>dqcheckr</code> directly.</p>
+<div class="section level2">
+<h2 id="status-maintenance-mode">Status: maintenance mode<a class="anchor" aria-label="anchor" href="#status-maintenance-mode"></a>
+</h2>
+<p><code>dqcheckrGUI</code> is feature-complete. It receives bug fixes and compatibility updates only — configuration features are developed in <code>dqcheckr</code> itself, which offers a script-based workflow that does not need this interface. Existing deployments continue to work unchanged.</p>
+</div>
 <div class="section level2">
 <h2 id="what-it-does">What it does<a class="anchor" aria-label="anchor" href="#what-it-does"></a>
 </h2>

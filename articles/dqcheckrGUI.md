@@ -9,9 +9,16 @@ The app runs entirely on your local machine. No internet connection, no
 server, and no cloud services are required.
 
 `dqcheckrGUI` is feature-complete and is maintained for corrections
-only. Configuration features are developed in `dqcheckr` itself, which
-offers a script-based workflow that does not need this interface.
+only. Configuration features are developed in `dqcheckr` itself.
 Existing deployments continue to work unchanged.
+
+Since `dqcheckr` 0.3.0 the workflow described in this vignette is also
+available as plain function calls, with no app to run —
+`generate_dataset_config()` writes a fully-commented YAML config from a
+real delivery, `validate_config()` checks it, `run_dq_check()` runs the
+checks, and `list_runs()` replaces the history screen. If you are
+setting up a new deployment, start there:
+[`vignette("workflow", package = "dqcheckr")`](https://mickmioduszewski.github.io/dqcheckr/articles/workflow.html).
 
 ## Prerequisites
 

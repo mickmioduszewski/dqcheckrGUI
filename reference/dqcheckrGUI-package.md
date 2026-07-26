@@ -21,9 +21,16 @@ Windows and OneDrive setups:
 ## Status
 
 dqcheckrGUI is feature-complete and is maintained for corrections only.
-Configuration features are developed in dqcheckr itself, which offers a
-script-based workflow that does not need this interface. Existing
+Configuration features are developed in dqcheckr itself. Existing
 deployments continue to work unchanged.
+
+Since dqcheckr 0.3.0 the workflow this interface provides is available
+as plain function calls, with no 'shiny' app to run:
+`generate_dataset_config()` inspects a delivery and writes a
+fully-commented YAML config, `validate_config()` checks it,
+[`run_dq_check()`](https://mickmioduszewski.github.io/dqcheckr/reference/run_dq_check.html)
+runs the checks, and `list_runs()` lists past runs. See
+[`vignette("workflow", package = "dqcheckr")`](https://mickmioduszewski.github.io/dqcheckr/articles/workflow.html).
 
 ## Related packages
 

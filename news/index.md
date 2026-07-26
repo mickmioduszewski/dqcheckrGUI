@@ -2,6 +2,8 @@
 
 ## dqcheckrGUI 0.2.2
 
+CRAN release: 2026-07-25
+
 This is the feature-complete release: `dqcheckrGUI` now enters
 **maintenance mode** and will receive bug fixes and compatibility
 updates only. Configuration features are developed in `dqcheckr` itself,

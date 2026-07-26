@@ -11,8 +11,8 @@
 <script src="deps/bootstrap-5.3.8/bootstrap.bundle.min.js"></script><link href="deps/font-awesome-6.5.2/css/all.min.css" rel="stylesheet">
 <link href="deps/font-awesome-6.5.2/css/v4-shims.min.css" rel="stylesheet">
 <script src="deps/headroom-0.11.0/headroom.min.js"></script><script src="deps/headroom-0.11.0/jQuery.headroom.min.js"></script><script src="deps/bootstrap-toc-1.0.1/bootstrap-toc.min.js"></script><script src="deps/clipboard.js-2.0.11/clipboard.min.js"></script><script src="deps/search-1.0.0/autocomplete.jquery.min.js"></script><script src="deps/search-1.0.0/fuse.min.js"></script><script src="deps/search-1.0.0/mark.min.js"></script><!-- pkgdown --><script src="pkgdown.js"></script><meta property="og:title" content="dqcheckrGUI — Point-and-Click GUI for dqcheckr">
-<meta name="description" content="A graphical user interface for the dqcheckr package. Provides a point-and-click shiny application for configuring dataset quality checks, running them against recurring file deliveries, and browsing historical check results — without writing any R code. The package is feature-complete and is now maintained for corrections only; configuration features are developed in dqcheckr itself, which offers a script-based workflow that does not need this interface.">
-<meta property="og:description" content="A graphical user interface for the dqcheckr package. Provides a point-and-click shiny application for configuring dataset quality checks, running them against recurring file deliveries, and browsing historical check results — without writing any R code. The package is feature-complete and is now maintained for corrections only; configuration features are developed in dqcheckr itself, which offers a script-based workflow that does not need this interface.">
+<meta name="description" content="A graphical user interface for the dqcheckr package. Provides a point-and-click shiny application for configuring dataset quality checks, running them against recurring file deliveries, and browsing historical check results — without writing any R code. The package is feature-complete and is now maintained for corrections only; configuration features are developed in dqcheckr itself, which since version 0.3.0 offers the same workflow as plain function calls, described in its workflow vignette.">
+<meta property="og:description" content="A graphical user interface for the dqcheckr package. Provides a point-and-click shiny application for configuring dataset quality checks, running them against recurring file deliveries, and browsing historical check results — without writing any R code. The package is feature-complete and is now maintained for corrections only; configuration features are developed in dqcheckr itself, which since version 0.3.0 offers the same workflow as plain function calls, described in its workflow vignette.">
 </head>
 <body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
@@ -54,7 +54,16 @@
 <div class="section level2">
 <h2 id="status-maintenance-mode">Status: maintenance mode<a class="anchor" aria-label="anchor" href="#status-maintenance-mode"></a>
 </h2>
-<p><code>dqcheckrGUI</code> is feature-complete. It receives bug fixes and compatibility updates only — configuration features are developed in <code>dqcheckr</code> itself, which offers a script-based workflow that does not need this interface. Existing deployments continue to work unchanged.</p>
+<p><code>dqcheckrGUI</code> is feature-complete. It receives bug fixes and compatibility updates only — configuration features are developed in <code>dqcheckr</code> itself. Existing deployments continue to work unchanged.</p>
+<p>Since <code>dqcheckr</code> 0.3.0 the whole workflow this interface provides is available as plain function calls, with no Shiny app to run:</p>
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># inspect a real delivery, write a fully-commented YAML config</span></span>
+<span><span class="fu">generate_dataset_config</span><span class="op">(</span><span class="st">"input_data/sales/2026-07.csv"</span>, dataset_name <span class="op">=</span> <span class="st">"sales"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu">validate_config</span><span class="op">(</span><span class="st">"sales"</span><span class="op">)</span>   <span class="co"># check the config before you rely on it</span></span>
+<span><span class="fu">run_dq_check</span><span class="op">(</span><span class="st">"sales"</span><span class="op">)</span>      <span class="co"># run the checks, render the report</span></span>
+<span><span class="fu">list_runs</span><span class="op">(</span><span class="st">"sales"</span><span class="op">)</span>         <span class="co"># what the history screen used to show</span></span></code></pre></div>
+<p>The generated YAML documents every available option inline, so it is meant to be read and hand-edited. See <a href="https://mickmioduszewski.github.io/dqcheckr/articles/workflow.html" class="external-link"><code>vignette("workflow", package = "dqcheckr")</code></a> for the full walkthrough, including drift comparison and fixed-width files.</p>
 </div>
 <div class="section level2">
 <h2 id="what-it-does">What it does<a class="anchor" aria-label="anchor" href="#what-it-does"></a>
@@ -68,7 +77,7 @@
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
-<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># Install dqcheckr first (required)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/install.packages.html" class="external-link">install.packages</a></span><span class="op">(</span><span class="st">"dqcheckr"</span><span class="op">)</span></span>
 <span></span>
@@ -78,7 +87,7 @@
 <div class="section level2">
 <h2 id="launch">Launch<a class="anchor" aria-label="anchor" href="#launch"></a>
 </h2>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">dqcheckrGUI</span><span class="fu">::</span><span class="fu"><a href="reference/run_app.html">run_app</a></span><span class="op">(</span><span class="op">)</span></span></code></pre></div>
 <p>Or, if you have downloaded the source, double-click <code>launch.command</code> (Mac), <code>launch.sh</code> (Linux), or <code>launch.bat</code> (Windows).</p>
 </div>
@@ -86,7 +95,7 @@
 <h2 id="example-configuration-files">Example configuration files<a class="anchor" aria-label="anchor" href="#example-configuration-files"></a>
 </h2>
 <p>Example YAML configuration files using the Star Wars dataset are included with the package. Copy them to a local folder to use as a starting point:</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/files.html" class="external-link">file.copy</a></span><span class="op">(</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata/example_config"</span>, package <span class="op">=</span> <span class="st">"dqcheckrGUI"</span><span class="op">)</span>,</span>
 <span>  <span class="st">"my_config"</span>,</span>

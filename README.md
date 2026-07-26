@@ -10,9 +10,25 @@ code. If you prefer scripting, use `dqcheckr` directly.
 ## Status: maintenance mode
 
 `dqcheckrGUI` is feature-complete. It receives bug fixes and compatibility
-updates only — configuration features are developed in `dqcheckr` itself, which
-offers a script-based workflow that does not need this interface. Existing
-deployments continue to work unchanged.
+updates only — configuration features are developed in `dqcheckr` itself.
+Existing deployments continue to work unchanged.
+
+Since `dqcheckr` 0.3.0 the whole workflow this interface provides is available
+as plain function calls, with no Shiny app to run:
+
+```r
+# inspect a real delivery, write a fully-commented YAML config
+generate_dataset_config("input_data/sales/2026-07.csv", dataset_name = "sales")
+
+validate_config("sales")   # check the config before you rely on it
+run_dq_check("sales")      # run the checks, render the report
+list_runs("sales")         # what the history screen used to show
+```
+
+The generated YAML documents every available option inline, so it is meant to be
+read and hand-edited. See
+[`vignette("workflow", package = "dqcheckr")`](https://mickmioduszewski.github.io/dqcheckr/articles/workflow.html)
+for the full walkthrough, including drift comparison and fixed-width files.
 
 ## What it does
 

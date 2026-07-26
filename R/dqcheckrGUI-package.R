@@ -17,9 +17,17 @@
 #'
 #' @section Status:
 #' \pkg{dqcheckrGUI} is feature-complete and is maintained for corrections
-#' only.  Configuration features are developed in \pkg{dqcheckr} itself, which
-#' offers a script-based workflow that does not need this interface.  Existing
-#' deployments continue to work unchanged.
+#' only.  Configuration features are developed in \pkg{dqcheckr} itself.
+#' Existing deployments continue to work unchanged.
+#'
+#' Since \pkg{dqcheckr} 0.3.0 the workflow this interface provides is available
+#' as plain function calls, with no 'shiny' app to run:
+#' \code{\link[dqcheckr]{generate_dataset_config}()} inspects a delivery and
+#' writes a fully-commented YAML config,
+#' \code{\link[dqcheckr]{validate_config}()} checks it,
+#' \code{\link[dqcheckr]{run_dq_check}()} runs the checks, and
+#' \code{\link[dqcheckr]{list_runs}()} lists past runs.  See
+#' \code{vignette("workflow", package = "dqcheckr")}.
 #'
 #' @section Related packages:
 #' \pkg{dqcheckrGUI} delegates all data processing to \pkg{dqcheckr}.

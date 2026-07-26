@@ -12,8 +12,8 @@ Description:
     running them against recurring file deliveries, and browsing historical
     check results — without writing any R code. The package is feature-complete
     and is now maintained for corrections only; configuration features are
-    developed in 'dqcheckr' itself, which offers a script-based workflow that
-    does not need this interface.
+    developed in 'dqcheckr' itself, which since version 0.3.0 offers the same
+    workflow as plain function calls, described in its 'workflow' vignette.
 License: MIT + file LICENSE
 URL: https://mickmioduszewski.github.io/dqcheckrGUI/, https://github.com/mickmioduszewski/dqcheckrGUI
 BugReports: https://github.com/mickmioduszewski/dqcheckrGUI/issues
